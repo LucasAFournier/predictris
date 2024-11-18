@@ -1,0 +1,25 @@
+#BlueJ class context
+comment0.target=AppletContext
+comment1.params=s
+comment1.target=AppletContext(AppletStub)
+comment10.params=
+comment10.target=java.util.Iterator\ getStreamKeys()
+comment11.params=key\ stream
+comment11.target=void\ setStream(java.lang.String,\ java.io.InputStream)
+comment2.params=name
+comment2.target=java.applet.Applet\ getApplet(java.lang.String)
+comment3.params=
+comment3.target=java.util.Enumeration\ getApplets()
+comment4.params=url
+comment4.target=java.applet.AudioClip\ getAudioClip(java.net.URL)
+comment5.params=url
+comment5.target=java.awt.Image\ getImage(java.net.URL)
+comment6.params=url
+comment6.target=void\ showDocument(java.net.URL)
+comment7.params=url\ target
+comment7.target=void\ showDocument(java.net.URL,\ java.lang.String)
+comment8.params=status
+comment8.target=void\ showStatus(java.lang.String)
+comment9.params=key
+comment9.target=java.io.InputStream\ getStream(java.lang.String)
+numComments=12

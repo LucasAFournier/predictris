@@ -1,0 +1,8 @@
+#BlueJ class context
+comment0.params=x\ y
+comment0.target=int\ get(int,\ int)
+comment0.text=Return\ the\ block\ value\ at\ the\ given\ coordinates\n@param\ x\ \ \ \ \ \ \ \ x\ coordinate\ of\ the\ block\ to\ extract\n@param\ y\ \ \ \ \ \ \ \ y\ coordinate\ of\ the\ block\ to\ extract\n@return\ \ \ \ \ \ \ \ \ block\ value\ at\ these\ coordinates\ \n
+comment1.params=layer\ view
+comment1.target=int[]\ overlap(Layer,\ View)
+comment1.text=Test\ if\ there\ are\ violated\ constraints\ with\ the\ given\ layer\n(i.e.\ are\ there\ overlaps\ between\ non\ empty\ blocks)\n@param\ layer\ \ \ \ \ layer\ to\ test\ against\ this\ one\ \n@param\ view\ \ \ \ \ \ view\ to\ limit\ the\ search\n@return\ \ \ \ \ \ \ \ \ \ coordinates\ of\ the\ overlap\ or\ null\ if\ there\ is\ none\ \n
+numComments=2

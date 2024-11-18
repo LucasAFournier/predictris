@@ -1,0 +1,7 @@
+#BlueJ class context
+comment0.params=x\ y
+comment0.target=int\ get(int,\ int)
+comment1.params=layer
+comment1.target=void\ add(Layer)
+comment1.text=Add\ a\ layer\ to\ this\ compound\ layer\n(utility\ method)\ \n
+numComments=2

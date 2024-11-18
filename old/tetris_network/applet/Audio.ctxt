@@ -1,0 +1,7 @@
+#BlueJ class context
+comment0.params=file
+comment0.target=Audio(String)
+comment1.target=void\ loop()
+comment2.target=void\ play()
+comment3.target=void\ stop()
+numComments=4

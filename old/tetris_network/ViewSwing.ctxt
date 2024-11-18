@@ -1,0 +1,9 @@
+#BlueJ class context
+comment0.params=view
+comment0.target=ViewSwing(View)
+comment0.text=Constructor\ \n
+comment1.params=e
+comment1.target=void\ interact(EventObject)
+comment2.params=g
+comment2.target=void\ render(Graphics2D)
+numComments=3

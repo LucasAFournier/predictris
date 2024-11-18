@@ -1,0 +1,10 @@
+#BlueJ class context
+comment0.params=x\ y\ width\ height
+comment0.target=View(int,\ int,\ int,\ int)
+comment0.text=Constructor\ \n
+comment1.params=ref
+comment1.target=View(View)
+comment2.params=layer
+comment2.target=void\ get(Layer)
+comment2.text=Obtain\ a\ view\ of\ the\ given\ layer\ (within\ this\ view\ coordinates)\n@param\ layer\ \ \ \ layer\ from\ which\ block\ values\ should\ be\ extracted\ \n
+numComments=3

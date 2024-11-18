@@ -1,0 +1,14 @@
+#BlueJ class context
+comment0.target=JPanelDB()
+comment0.text=Constructor\ \n
+comment1.params=event
+comment1.target=void\ interact(EventObject)
+comment1.text=Interactions\ with\ the\ interface\ \n
+comment2.target=void\ createBackBuffer()
+comment2.text=Creation\ of\ a\ back\ buffer\ if\ not\ existing\ \n
+comment3.params=g
+comment3.target=void\ paint(Graphics)
+comment4.params=g
+comment4.target=void\ render(Graphics2D)
+comment4.text=True\ repaint\ function\ where\ commands\nto\ draw\ elements\ are\ to\ be\ put\n(this\ function\ should\ not\ be\ called\ directly)\n@param\ \ g\ \ \ graphics\ environment\ given\ by\ the\ paint\ function\ \n
+numComments=5

@@ -1,0 +1,16 @@
+#BlueJ class context
+comment0.target=Tetris
+comment0.text=\r\n\ Tetris\ model\r\n\ \r\n\ @author\ Jean-Charles\ Quinton\r\n\ @version\ 07/06/2011\r\n\ creation\ 07/06/2011\r\n
+comment1.params=width\ height
+comment1.target=Tetris(int,\ int)
+comment1.text=Constructor\ for\ the\ Tetris\ model
+comment2.params=dx
+comment2.target=void\ moveTetromino(int)
+comment2.text=Move\ the\ tetromino
+comment3.params=da
+comment3.target=void\ rotateTetromino(int)
+comment3.text=Rotate\ the\ tetromino
+comment4.params=
+comment4.target=void\ fallTetromino()
+comment4.text=Rotate\ the\ tetromino
+numComments=5
