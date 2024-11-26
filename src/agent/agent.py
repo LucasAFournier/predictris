@@ -1,11 +1,12 @@
 import numpy as np
+from typing import Callable
 
 class Agent():
 
     def __init__(
         self,
-        actions: list[callable[[], None]],
-        observe: callable[[], np.ndarray]
+        actions: list[Callable[[], None]],
+        observe: Callable[[], np.ndarray]
     ):
         self.actions = actions
         self.observe = observe
