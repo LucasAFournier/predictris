@@ -1,0 +1,9 @@
+coclust
+matplotlib
+networkx
+numpy
+pyvis
+scikit-learn
+scipy
+seaborn
+tqdm
