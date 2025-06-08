@@ -1,0 +1,17 @@
+<tr class="tree-row">
+    <td>
+        <a href="{tree_name}.html" class="tree-link">
+            <div class="tree-cell">
+                <img src="data:image/png;base64,{pred_image}" 
+                     class="tree-preview" 
+                     title="Click to view tree details">
+                {display_name}
+            </div>
+        </a>
+    </td>
+    <td>{total_nodes}</td>
+    <td><img src="data:image/png;base64,{level_hist}" 
+            class="histogram" alt="Level distribution"></td>
+    <td><img src="data:image/png;base64,{confidence_hist}" 
+            class="histogram" alt="Confidence score distribution"></td>
+</tr>
