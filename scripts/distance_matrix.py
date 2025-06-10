@@ -13,7 +13,7 @@ from predictris.tetris.encoders import actions_from_nameset, perceptions_from_na
 from predictris.utils import create_random_environment, dir_from_params
 
 
-def build_transition_graph(actions: list[int], perception: int, epochs: int, steps: int, view: tuple[int, int]):
+def build_transition_graph(episode: int, steps: int, view: tuple[int, int]):
     """Build transition graph from random episodes."""
     graph = nx.DiGraph()
     auth_view = (view[0] - 2, view[1] - 2)
@@ -26,9 +26,8 @@ def build_transition_graph(actions: list[int], perception: int, epochs: int, ste
     
     for _ in pbar:        
         env = create_random_environment(auth_view=auth_view)
-        body = env.get_body(view)
 
-        curr_obs = body.perceive(perception)
+        curr_obs = agent.observe()
         for _ in range(steps):
             prev_obs = curr_obs
             body.act((action := random.choice(actions)))

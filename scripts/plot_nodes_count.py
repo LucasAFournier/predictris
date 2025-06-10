@@ -10,6 +10,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Plot nodes count data from CSV files')
     parser.add_argument('--dirs', type=str, nargs='+', required=True,
                        help='List of experiment directories to compare')
+    parser.add_argument('--output', type=str, help='Output file path for saving the plot')
     return parser.parse_args()
 
 
@@ -154,4 +155,5 @@ def load_csv_files(directory: Path) -> tuple[list, list, list, list]:
 if __name__ == '__main__':
     args = parse_args()
     data_series, common_params, labels = load_experiment_data(args)
-    plot_nodes_data(data_series, format_title(common_params), labels)
+    output_path = Path('plots') / args.output if args.output else None
+    plot_nodes_data(data_series, format_title(common_params), labels, output_path)

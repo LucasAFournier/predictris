@@ -14,11 +14,10 @@ CONFIDENCE_THRESHOLD = 0.95
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Train Tetris agent')
+    parser = argparse.ArgumentParser(description='Train Tetris agent and collect nodes count data')
     parser.add_argument('--dir', type=str, required=False, default=None,
                         help='Directory for existing prediction trees')
     parser.add_argument('--tetrominos', type=str, required=False, nargs='+', help='List of tetrominos')
-    parser.add_argument('--context', type=int)
     parser.add_argument('--episode', type=int, help='Maximum number of actions per episode')
     parser.add_argument('--action', type=str, choices=['from_active', 'random'], help='Action choice method')
     parser.add_argument('--activation', type=str, choices=['by_confidence', 'all'], help='Activation function')
@@ -30,12 +29,12 @@ def parse_args():
     return parser.parse_args()
 
 
-def run_episode(env: TetrisEnvironment, agent: Agent, episode: int, context_size: int, action_choice: str, activation: str, tetrominos: list):
+def run_episode(env: TetrisEnvironment, agent: Agent, episode: int, action_choice: str, activation: str, tetrominos: list):
     """Run a single training episode."""
     result = 'abort'
     while result == 'abort':
         env.random_init(tetrominos)
-        result = agent.init_learn(context_size, action_choice, activation, metrics=True)
+        result = agent.init_learn(action_choice, activation, metrics=True)
 
     step = 1
     start = time.time()
@@ -54,19 +53,18 @@ def collect_data(env: TetrisEnvironment, agent: Agent, args, pbar):
     preds_since_update = 0
     correct_preds_since_update = 0
 
-    steps = [0]
-    time_per_step = [0]
-    pred_success = [0]
-    nodes = [0]
-    filtered = [0]
+    steps = []
+    time_per_step = []
+    pred_success = []
+    nodes = []
+    filtered = []
 
     update_interval = args.steps / NUM_MEASUREMENTS
     next_update = update_interval
 
     while total_steps < args.steps:
         step_count, learn_time, preds, correct_preds = run_episode(env, agent, args.episode,
-                                           args.context, args.action,
-                                           args.activation, args.tetrominos)
+                                                                   args.action, args.activation, args.tetrominos)
         total_steps += step_count
         steps_since_update += step_count
         time_since_update += learn_time
@@ -76,7 +74,10 @@ def collect_data(env: TetrisEnvironment, agent: Agent, args, pbar):
         if total_steps >= next_update:
             steps.append(total_steps)
             time_per_step.append(round(time_since_update / steps_since_update, 4))
-            pred_success.append(round(correct_preds_since_update / preds_since_update, 4))
+            pred_success.append(
+                round(correct_preds_since_update / preds_since_update, 4)
+                if preds_since_update != 0 else 0.0
+            )
             nodes.append(agent.get_nodes_count())
             filtered.append(agent.get_nodes_count(filter=CONFIDENCE_THRESHOLD))
             
@@ -115,7 +116,6 @@ def main():
     dir = dir_from_params(
         dir = f'({args.dir})' if args.dir else None,
         tetrominos = ''.join(args.tetrominos) if args.tetrominos else None,
-        context = args.context,
         episode = args.episode,
         action = args.action.replace('_', ''),
         activation = args.activation.replace('_', ''),

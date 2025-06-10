@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_nodes_data(histories, title, legends):
+def plot_nodes_data(histories, title, legends, output_path=None):
     """Create a 3x1 grid plot showing nodes counts and time per step vs steps."""
     fig = plt.figure(figsize=(10, 24))
     gs = fig.add_gridspec(4, 1, hspace=0.05)
@@ -46,9 +46,18 @@ def plot_nodes_data(histories, title, legends):
     axes[2].set_ylabel('Time per Step (s)')
     axes[3].set_ylabel('Prediction Success Rate')
     
+    axes[0].set_ylim(bottom=0)
+    axes[1].set_ylim(bottom=0)
+    axes[2].set_ylim(bottom=0)
+    axes[3].set_ylim(0, 1)
+
     if legends:
         axes[3].legend(loc='lower right')
+    
+    if output_path:
+        plt.savefig(output_path)
     plt.show()
+
 
 def plot_means(ax, x, y_data, x_data=None, color=None, label=None, bounds=False):
     """Plot mean with min/max bounds for given data."""

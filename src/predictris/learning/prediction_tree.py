@@ -1,11 +1,9 @@
 import pickle
-from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
 from uuid import UUID, uuid4
 import networkx as nx
-import numpy as np
 
 from .learning_utils import filename_from_obs, init_node_metrics, update_node_metrics
 
@@ -18,9 +16,9 @@ class ObservationAction(NamedTuple):
 
 @dataclass
 class Context:
-    """Context state containing history and entry node identifiers."""
-    history: deque[ObservationAction] 
-    entry: UUID
+    """Context state containing observation-action pair and entry node identifiers."""
+    oa: ObservationAction
+    node: UUID
 
 
 class PredictionTreeCache(set[tuple]):
@@ -68,7 +66,7 @@ class PredictionTree(nx.DiGraph):
             context (Context): Context state containing history and entry node identifiers
             correct_pred (bool): Whether the prediction was correct
         """
-        context_node = self.nodes[context.entry]
+        context_node = self.nodes[context.node]
         if not correct_pred:
             context_node["confident"] = False
         elif not context_node["confident"]:
@@ -96,24 +94,26 @@ class PredictionTree(nx.DiGraph):
         """Create new context path for correct predictions.
         
         Args:
-            context (Context): Context state containing history and entry node
+            context (Context): Context state containing observation-action pair and entry node identifiers
         """
-        prev_node = context.entry
-        # Iterate over history in ante-chronological order
-        for obs, action in reversed(context.history):
-            try:
-                # Check if the node already exists
-                for existing_node, _, existing_action in self.in_edges(prev_node, data='action'):
-                    if action == existing_action and self.nodes[existing_node]["obs"] == obs:
-                        next_node = existing_node
-                        raise StopIteration
-                # If not, create a new node
-                next_node = self._reinforce(obs)
-            except StopIteration:
-                pass
-    
-            self.add_edge(next_node, prev_node, action=action)
-            prev_node = next_node
+        
+        try:
+            observation, action = context.oa
+
+            # Check if the node already exists
+            for existing_node, _, existing_action in self.in_edges(context.node, data='action'):
+                if action == existing_action and self.nodes[existing_node]["obs"] == observation:
+                    next_node = existing_node
+                    raise StopIteration
+
+            # If not, create a new node
+            next_node = self._reinforce(observation)
+
+            self.add_edge(next_node, context.node, action=action)
+
+        except:
+            pass
+
 
     def _reinforce(self, obs: tuple) -> UUID:
         """Add a new node to the tree and return its identifier.

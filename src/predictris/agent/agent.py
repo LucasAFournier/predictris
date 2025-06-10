@@ -31,7 +31,7 @@ class Agent:
         """Initialize agent with action and perception capabilities."""
         self.action_dict = action_dict
         self.perception_dict = perception_dict
-        self.trees_by_pred_obs = dict[tuple, PredictionTree]()
+        self.trees_by_pred = dict[tuple, PredictionTree]()
         self.verbose = verbose
         
     #region Interaction
@@ -64,11 +64,10 @@ class Agent:
     #endregion
     #region Learning
 
-    def init_learn(self, context_size: int, action_choice: str, activation: str, metrics: bool = False) -> tuple:
+    def init_learn(self, action_choice: str, activation: str, metrics: bool = False) -> tuple:
         """Initialize agent for learning mode.
         
         Args:
-            context_size (int): Size of history to maintain.
             action_choice (str): Action choice strategy.
             activation (str): Activation strategy.
         
@@ -80,18 +79,21 @@ class Agent:
                 'preds': 0,
                 'correct_preds': 0,
             }
+        else:
+            self.metrics = None
         
         self.action_choice = action_choice
         self.activation = activation
         
         obs = self.observe()
-        self.history = deque[OA](maxlen=context_size)
+        self.last_oa: OA = None
         self.next_actions = deque[int]()
-        
-        self.active_contexts_by_pred_obs = dict[tuple, dict[UUID, Context]]()
+    
+        self.active_contexts_by_pred = dict[tuple, dict[UUID, Context]]()
         
         if not is_valid(obs):
             return 'abort'
+        
         self._update_current_tree(obs)
         self._update_active_contexts(obs, None)
         self.prev_obs = obs 
@@ -110,27 +112,27 @@ class Agent:
     def _apply_action_and_observe(self):
         action = self._get_next_action()
         self.act(action)
-        self.history.append(OA(self.prev_obs, action))
+        self.last_oa = OA(self.prev_obs, action)
         obs = self.observe()
 
         return action, obs
 
     def _update_current_tree(self, obs: tuple):
         # Add new tree if observation is new
-        current_tree = self.trees_by_pred_obs.setdefault(obs, PredictionTree(obs))
+        current_tree = self.trees_by_pred.setdefault(obs, PredictionTree(obs))
         # Add new node if sequence is new
-        current_tree.reinforce_correct_prediction(Context(self.history.copy(), current_tree.pred_node))
+        current_tree.reinforce_correct_prediction(Context(self.last_oa, current_tree.pred_node))
 
     def _update_active_contexts(self, obs: tuple, action: int):
         # Prepare updated active contexts
-        new_active_contexts_by_pred_obs = dict[tuple, dict[UUID, Context]]()
+        new_active_contexts_by_pred = dict[tuple, dict[UUID, Context]]()
 
-        for pred_obs, tree in self.trees_by_pred_obs.items():
+        for pred, tree in self.trees_by_pred.items():
             candidate_nodes = tree.get_nodes_from_obs(obs).copy()
             updated_contexts = {}
             
             # Iterate over previous active contexts
-            for prev_node, context in self.active_contexts_by_pred_obs.get(pred_obs, {}).items():
+            for prev_node, context in self.active_contexts_by_pred.get(pred, {}).items():
                 # Get next node and action
                 _, next_node, other_action = next(iter(tree.out_edges(prev_node, data='action')))
                 if other_action == action:
@@ -138,11 +140,11 @@ class Agent:
                         # Update prediction if next node is the prediction node
                         tree.update_prediction(
                             context,
-                            correct_pred=(obs == pred_obs),
+                            correct_pred=(obs == pred),
                         )
                         if self.metrics:
                             self.metrics['preds'] += 1
-                            self.metrics['correct_preds'] += int(obs == pred_obs)
+                            self.metrics['correct_preds'] += int(obs == pred)
 
                     elif next_node in candidate_nodes:
                         # Transfer context to next node if it matches previous observation and action
@@ -152,15 +154,15 @@ class Agent:
             # Create new contexts for remaining candidate nodes
             for node in candidate_nodes:
                 if self.activation == 'all':
-                    updated_contexts[node] = Context(self.history.copy(), node)
+                    updated_contexts[node] = Context(self.last_oa, node)
 
                 elif self.activation == 'by_confidence':
                     if random.random() < tree.nodes[node]['confidence']:
-                        updated_contexts[node] = Context(self.history.copy(), node)
-            
-            new_active_contexts_by_pred_obs[pred_obs] = updated_contexts
+                        updated_contexts[node] = Context(self.last_oa, node)
 
-        self.active_contexts_by_pred_obs = new_active_contexts_by_pred_obs
+            new_active_contexts_by_pred[pred] = updated_contexts
+
+        self.active_contexts_by_pred = new_active_contexts_by_pred
                     
     def _get_next_action(self) -> int:
         """Get next action."""
@@ -173,8 +175,8 @@ class Agent:
         if self.action_choice == 'from_active':
             active_nodes = self._get_active_nodes()
             if active_nodes:
-                pred_obs, node = random.choice(active_nodes)
-                tree = self.trees_by_pred_obs[pred_obs]
+                pred, node = random.choice(active_nodes)
+                tree = self.trees_by_pred[pred]
                 self.next_actions.extend(tree.get_actions_to_pred(node))
             else:
                 self.next_actions.append(random.choice(list(self.action_dict.keys())))
@@ -185,63 +187,10 @@ class Agent:
     def _get_active_nodes(self) -> set[tuple[tuple, UUID]]:
         """Get active nodes."""
         active = list[tuple[tuple, UUID]]()
-        for pred_obs, contexts in self.active_contexts_by_pred_obs.items():
+        for pred, contexts in self.active_contexts_by_pred.items():
             for node in contexts:
-                active.append((pred_obs, node))
+                active.append((pred, node))
         return active
-
-    #endregion
-    #region Prediction
-
-    def init_path_finding(self):
-        """Initialize path finding."""
-        self.current_obs = self.observe()
-        self.obs_history = [self.current_obs]
-        self.action_history = []
-        self.next_actions = deque[int]()
-
-    def find_path(self, target_obs: tuple, max_steps: int) -> tuple[list[tuple], list[int], bool]:
-        """Find path to a given observation."""
-        while (self.current_obs != target_obs
-               and len(self.obs_history) < max_steps):
-            action = self._get_next_path_action(self.current_obs, target_obs)
-            self.act(action)
-            self.current_obs = self.observe()
-            
-            self.action_history.append(action)
-            self.obs_history.append(self.current_obs)
-
-        return self.obs_history, self.action_history, (self.current_obs == target_obs)
-        
-    def _get_next_path_action(self, current_obs: tuple, target_obs: tuple) -> int:
-        """Get next action for path finding."""
-        while True:
-            try:
-                return self.next_actions.popleft()
-            except:
-                self._choose_path_actions(current_obs, target_obs)
-
-    def _choose_path_actions(self, current_obs: tuple, target_obs: tuple):
-        """Choose next actions for path finding."""
-        tree = self.trees_by_pred_obs[target_obs]
-        ids = tree.get_nodes_from_obs(current_obs)
-
-        while not ids:
-            tree = random.choice(list(self.trees_by_pred_obs.values()))
-            ids = tree.get_nodes_from_obs(current_obs)
-
-        chosen_id = self._choose_id(ids, tree)
-        self.next_actions.extend(tree.get_actions_to_pred(chosen_id))
-
-    def _choose_id(self, ids: set[UUID], tree: PredictionTree) -> UUID:
-        """Choose ID for path finding."""
-        return min(
-            ids,
-            key=(
-                lambda id_:
-                (tree.nodes[id_]['ambiguous'] + 1) / (tree.nodes[id_]['eval_count'] + 2)
-            )
-        )
 
     #endregion
     
@@ -253,7 +202,7 @@ class Agent:
         filepaths = glob.glob(str(dir / "*.gpickle"))
         for filepath in tqdm(filepaths, desc="Loading trees", leave=False):
             tree = PredictionTree.load(filepath)
-            self.trees_by_pred_obs[tree.pred_obs] = tree
+            self.trees_by_pred[tree.pred] = tree
             
         if verbose:
             print(f"Loaded {len(filepaths)} trees from {dir}")
@@ -261,15 +210,15 @@ class Agent:
     def save(self, dir: Path, verbose: bool = False):
         if verbose:
             print(f"\nSaving trees to {dir}")
-        for tree in self.trees_by_pred_obs.values():
+        for tree in self.trees_by_pred.values():
                     tree.save(dir)
 
     def get_confidence_between(self, from_obs: tuple, to_obs: tuple) -> float:
         """Calculate confidence of transitioning from one observation to another."""
-        if to_obs not in self.trees_by_pred_obs:
+        if to_obs not in self.trees_by_pred:
             return 0.0
             
-        tree = self.trees_by_pred_obs[to_obs]
+        tree = self.trees_by_pred[to_obs]
         ids = tree.get_nodes_from_obs(from_obs)
         
         if not ids:
@@ -286,7 +235,7 @@ class Agent:
                     [node for node, confidence in tree.nodes(data='confidence', default=0.0)
                      if confidence > filter]
                 )
-                for tree in self.trees_by_pred_obs.values()
+                for tree in self.trees_by_pred.values()
             )
         
-        return sum(len(tree) for tree in self.trees_by_pred_obs.values())
+        return sum(len(tree) for tree in self.trees_by_pred.values())
