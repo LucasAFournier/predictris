@@ -2,17 +2,17 @@
 
 *Developed and maintained by **Lucas Fournier**, **Jean-Charles Quinton**, **Mathieu Lefort**, and **Frédéric Armetta***  
 
-Predictris is an open-source framework for **online sensorimotor learning** that lets an autonomous agent discover and represent the regularities of its environment purely by trying to predict what will happen next. It combines **sequence-based memory**, **incremental updates at every time-step**, and a built-in notion of **curiosity** to build compact predictive models without any external rewards. <sup>[1]</sup>
+Predictris is an open-source framework for **online sensorimotor learning** that lets an autonomous agent discover and represent the regularities of its environment purely by trying to predict what will happen next. It combines **sequence-based memory**, **incremental updates at every time-step**, and a built-in notion of **curiosity** to build compact predictive models without any external rewards.
 
 ---
 
-## Overview <sup>[1]</sup>
+## Overview
 
 Artificial-vision and language models already outperform humans on many benchmarks, yet their skills remain narrow because they lack the **action-grounded structure** that underpins human cognition. Predictris addresses this gap by coupling perception, action, and prediction into a single closed loop, treating perception not as passive input but as an *active* mastery of **sensorimotor contingencies**—systematic relationships between what the agent does and what it then perceives.
 
 ---
 
-## Background and Key Principles <sup>[1]</sup>
+## Background and Key Principles
 
 * **Sequence-based Representation:** The world model stores traces of the form  
   *(observation *o* , action *a*) → observation *o′* *.*  
@@ -24,7 +24,7 @@ Artificial-vision and language models already outperform humans on many benchmar
 
 ---
 
-## Architecture: Predictive Trees <sup>[1]</sup>
+## Architecture: Predictive Trees
 
 A **Predictive Tree** is a rooted, labelled digraph that stores the *minimal* history required to forecast a chosen observation:
 
@@ -36,7 +36,7 @@ At each time-step the agent activates every node that matches its current percep
 
 ---
 
-## Simulation Environment <sup>[1]</sup>
+## Simulation Environment
 
 We evaluate Predictris in a **Tetris-inspired 2‑D grid world**:
 
