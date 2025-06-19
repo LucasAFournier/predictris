@@ -1,6 +1,6 @@
 # Predictris
 
-*Developed and maintained by **Lucas Fournier**, **Jean-Charles Quinton**, **Mathieu Lefort**, and **Frédéric Armetta***  
+*Developed and maintained by **Lucas Fournier** in collaboration with **Jean-Charles Quinton**, **Mathieu Lefort**, and **Frédéric Armetta***  
 
 Predictris is an open-source framework for **online sensorimotor learning** that lets an autonomous agent discover and represent the regularities of its environment purely by trying to predict what will happen next. It combines **sequence-based memory**, **incremental updates at every time-step**, and a built-in notion of **curiosity** to build compact predictive models without any external rewards.
 
