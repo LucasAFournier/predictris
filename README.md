@@ -32,7 +32,7 @@ A **Predictive Tree** is a rooted, labelled digraph that stores the *minimal* hi
 * **Edges** are labelled by actions.  
 * The **root** is the observation the tree aims to predict.
 
-At each time-step the agent activates every node that matches its current perception and follows the outgoing edge corresponding to the executed action. Reaching the root tests a prediction; failure marks the source node “unconfident”, whereas a later success triggers *backward induction*—a new node for a further-past observation and action is prepended, and the node is relabelled “confident”. Extensions occur **only** on previously unconfident nodes, so each tree converges to the shortest prefix sufficient for reliable prediction, yielding a compact, adaptive memory. <sup>[1]</sup>
+At each time-step the agent activates every node that matches its current perception and follows the outgoing edge corresponding to the executed action. Reaching the root tests a prediction; failure marks the source node “unconfident”, whereas a later success triggers *backward induction*—a new node for a further-past observation and action is prepended, and the node is relabelled “confident”. Extensions occur **only** on previously unconfident nodes, so each tree converges to the shortest prefix sufficient for reliable prediction, yielding a compact, adaptive memory.
 
 ---
 
