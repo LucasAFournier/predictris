@@ -8,10 +8,14 @@ import networkx as nx
 from .learning_utils import filename_from_obs, init_node_metrics, update_node_metrics
 
 
+Observation = tuple
+Action = int
+
+
 class ObservationAction(NamedTuple):
     """Observation-Action pair representing a state transition."""
-    observation: tuple
-    action: int
+    observation: Observation
+    action: Action
 
 
 @dataclass
@@ -21,11 +25,11 @@ class Context:
     node: UUID
 
 
-class PredictionTreeCache(set[tuple]):
+class PredictionTreeCache(set[Observation]):
     def __init__(self):
         super().__init__()
 
-    def get(self, obs: tuple) -> tuple:
+    def get(self, obs: Observation) -> Observation:
         for existing in self:
             if existing == obs:
                 del obs
@@ -39,51 +43,34 @@ class PredictionTreeCache(set[tuple]):
 class PredictionTree(nx.DiGraph):
     _cache = PredictionTreeCache()
     
-    def __init__(self, obs: tuple, id_generator: callable = uuid4):
+    def __init__(self, obs: Observation, depth: int, id_generator: callable = uuid4):
         super().__init__()
+        self.depth = depth
         self.id_generator = id_generator
-        self._nodes_by_obs = dict[tuple, set[UUID]]()
+        self._nodes_by_obs = dict[Observation, set[UUID]]()
         
         self.pred_obs = self._cache.get(obs)
         self.pred_node = self.id_generator()
-        self.add_node(self.pred_node, obs=self.pred_obs)
+        self.add_node(self.pred_node, obs=self.pred_obs, level=0)
 
-    def get_nodes_from_obs(self, obs: tuple) -> set[UUID]:
-        """Find matching nodes.
-        
-        Args:
-            obs (tuple): Observation to match
-            
-        Returns:
-            set[UUID]: Matching node identifiers
-        """
+    def get_nodes_from_obs(self, obs: Observation) -> set[UUID]:
+        """Find matching nodes."""
         return self._nodes_by_obs.get(self._cache.get(obs), set[UUID]())
 
     def update_prediction(self, context: Context, correct_pred: bool):
-        """Update prediction tree based on context and correctness of prediction.
-        
-        Args:
-            context (Context): Context state containing history and entry node identifiers
-            correct_pred (bool): Whether the prediction was correct
-        """
+        """Update prediction tree based on context and correctness of prediction."""
         context_node = self.nodes[context.node]
         if not correct_pred:
             context_node["confident"] = False
         elif not context_node["confident"]:
-            self.reinforce_correct_prediction(context)
+            if context_node["level"] < self.depth:
+                self.reinforce_correct_prediction(context)
             context_node["confident"] = True
             
         update_node_metrics(context_node, correct_pred)
         
-    def get_actions_to_pred(self, node: UUID) -> list[int]:
-        """Get action sequence to prediction node.
-        
-        Args:
-            node (UUID): Node identifier
-            
-        Returns:
-            list[int]: Action sequence to prediction node
-        """
+    def get_actions_to_pred(self, node: UUID) -> list[Action]:
+        """Get action sequence to prediction node."""
         actions = []
         while (edges := self.out_edges(node, data='action')):
             _, node, action = next(iter(edges))
@@ -91,12 +78,7 @@ class PredictionTree(nx.DiGraph):
         return actions
 
     def reinforce_correct_prediction(self, context: Context):
-        """Create new context path for correct predictions.
-        
-        Args:
-            context (Context): Context state containing observation-action pair and entry node identifiers
-        """
-        
+        """Create new context path for correct predictions."""
         try:
             observation, action = context.oa
 
@@ -107,7 +89,7 @@ class PredictionTree(nx.DiGraph):
                     raise StopIteration
 
             # If not, create a new node
-            next_node = self._reinforce(observation)
+            next_node = self._reinforce(observation, self.nodes[context.node]["level"] + 1)
 
             self.add_edge(next_node, context.node, action=action)
 
@@ -115,19 +97,12 @@ class PredictionTree(nx.DiGraph):
             pass
 
 
-    def _reinforce(self, obs: tuple) -> UUID:
-        """Add a new node to the tree and return its identifier.
-        
-        Args:
-            obs (tuple): Observation to add as node
-
-        Returns:
-            UUID: Identifier of the added node
-        """
+    def _reinforce(self, obs: Observation, level: int) -> UUID:
+        """Add a new node to the tree and return its identifier."""
         obs = self._cache.get(obs)
         node = self.id_generator()        
         metrics = init_node_metrics()
-        self.add_node(node, obs=obs, confident=True, **metrics)
+        self.add_node(node, obs=obs, confident=True, level=level, **metrics)
 
         self._nodes_by_obs.setdefault(obs, set[UUID]()).add(node)        
 

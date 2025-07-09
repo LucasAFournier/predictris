@@ -1,172 +1,101 @@
 import numpy as np
 from pathlib import Path
-import glob
-from tqdm import tqdm
 import random
+import csv
 
 from predictris.agent import Agent
-from predictris.learning import PredictionTree
 
-from .constants import TETROMINO_SHAPES, TETRIS_ACTIONS, TETRIS_PERCEPTIONS, TETROMINO_NAMES
+from .constants import TETROMINO_NAMES
 
+# Load valid states and create lookup
+VALID_STATES = {}
+with open(Path(__file__).parent / 'valid_states.csv') as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        name = row['name']
+        if name not in VALID_STATES:
+            VALID_STATES[name] = []
+        VALID_STATES[name].append((
+            name,
+            int(row['pos_x']),
+            int(row['pos_y']),
+            int(row['orientation']),
+        ))
+
+# Load observations and create lookup
+STATE_TO_OBS = {}
+with open(Path(__file__).parent / 'state_to_obs.csv') as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        state_key = (row['name'], 
+                    int(row['pos_x']), 
+                    int(row['pos_y']), 
+                    int(row['orientation']))
+        STATE_TO_OBS[state_key] = tuple(int(row[f'obs_{i}']) for i in range(9))
+
+# Load valid actions and create lookup
+VALID_ACTIONS = {}
+with open(Path(__file__).parent / 'valid_actions.csv') as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        from_key = (row['from_name'], 
+                   int(row['from_x']), 
+                   int(row['from_y']), 
+                   int(row['from_orientation']))
+        if from_key not in VALID_ACTIONS:
+            VALID_ACTIONS[from_key] = {}
+        VALID_ACTIONS[from_key][int(row['action'])] = (
+            row['to_name'],
+            int(row['to_x']),
+            int(row['to_y']),
+            int(row['to_orientation'])
+        )
 
 class TetrisEnvironment:
     """Represents the Tetris game environment."""
 
-    def __init__(self, tetromino_state: dict = None):
-        """Initialize the Tetris environment with a given Tetromino state.
-
-        Args:
-            tetromino_state (dict, optional): Dictionary representation of the Tetromino state. Defaults to None.
-        """
-        if tetromino_state is None:
+    def __init__(self, state: dict = None):
+        """Initialize the Tetris environment with a given Tetromino state."""
+        if state is None:
             self.random_init()
-
         else:
-            self.name = tetromino_state["name"]
-            self.position = tetromino_state["position"]
-            self.orientation = tetromino_state["orientation"]
-
-        self.shapes = TETROMINO_SHAPES[self.name]
-        self.offset = self.shapes["offset"]
-
-    def random_init(self, tetrominos: list[str] = None):
-        """Create a random environment with a tetromino placed near the view position."""
-        if not tetrominos:
-            tetrominos = TETROMINO_NAMES
+            self.state = state
         
-        self.__init__(
-            tetromino_state={
-                "name": random.choice(tetrominos),
-                "position": (random.randint(-3, 3), random.randint(-3, 3)),
-                "orientation": random.randint(0, 3),
-            }
-        )
+    def random_init(self, tetrominos: list[str] = TETROMINO_NAMES):
+        """Create a random environment with a valid tetromino configuration."""
+        name = random.choice(tetrominos)
+        self.state = random.choice(VALID_STATES[name])
         
-    def get_shape(self, orientation: int = None) -> list[tuple[int, int]]:
-        """Returns the shape of the Tetromino in the given orientation.
-        
-        Args:
-            orientation (int, optional): Orientation of the Tetromino. Defaults to None.
-
-        Returns:
-            list[tuple[int, int]]: List of (dx, dy) coordinates of the Tetromino shape
-        """
-        if orientation is None:
-            orientation = self.orientation
-        return self.shapes[orientation]
-
-    #region Interactions
-
-    def move_tetromino(self, dx: int, dy: int) -> None:
-        """Move the current Tetromino by the specified delta coordinates.
-
-        Args:
-            dx (int): Horizontal movement (-1 for left, 1 for right)
-            dy (int): Vertical movement (-1 for up, 1 for down)
-        """
-        self.position = (self.position[0] + dx, self.position[1] + dy)
-
-    def move_tetromino_left(self, agent: Agent):
-        self.move_tetromino(dx=-1, dy=0)
-
-    def move_tetromino_right(self, agent: Agent):
-        self.move_tetromino(dx=1, dy=0)
-
-    def move_tetromino_down(self, agent: Agent):
-        self.move_tetromino(dx=0, dy=1)
-
-    def move_tetromino_up(self, agent: Agent):
-        self.move_tetromino(dx=0, dy=-1)
-
-    def rotate_tetromino(self, clockwise: bool = True):
-        """Rotate the current Tetromino in the specified direction.
-
-        Args:
-            clockwise (bool, optional): Direction of rotation. Defaults to True.
-        """
-        rotation_delta = 1 if clockwise else -1
-        self.orientation = (self.orientation + rotation_delta) % 4
-
-    def rotate_tetromino_cw(self, _: int = None) -> None:
-        self.rotate_tetromino(clockwise=True)
-
     def vision(self, agent: Agent) -> tuple:
-        """Observe the current state of the environment.
+        """Get precomputed observation for current state."""
+        return STATE_TO_OBS[self.state]
 
-        Args:
-            agent (Agent): Agent object observing the environment.
-        
-        Returns:
-            tuple: Flattened view matrix of the environment.
-        """
-        # tetro_x, tetro_y = self.pos
-        # view_radius_x, view_radius_y = body.view_radius
+    def act(self, action_id: int) -> bool:
+        """Try to apply an action and update state if valid."""
+        try:
+            self.state = VALID_ACTIONS[self.state][action_id]
+        except KeyError:
+            pass # Invalid action, do nothing
 
-        # view = np.full(
-        #     shape=(2 * view_radius_x + 1, 2 * view_radius_y + 1),
-        #     fill_value=BACKGROUND_VALUE,
-        #     dtype=np.int8,
-        # )
-
-        # for dx, dy in self.get_shape():
-        #     x, y = tetro_x + int(dx + self.offset), tetro_y + int(dy + self.offset)
-        #     rel_x, rel_y = x + view_radius_x, y + view_radius_y
-
-        #     if 0 <= rel_x < 2 * view_radius_x + 1 and 0 <= rel_y < 2 * view_radius_y + 1:
-        #         view[rel_x, rel_y] = self.value
-
-        tetro_x, tetro_y = self.position
-        view = np.full(
-            shape=(3, 3),
-            fill_value=0,
-            dtype=int,
-        )
-
-        # Populate view matrix with tetromino blocks
-        for dx, dy in self.get_shape():
-            # Calculate absolute and relative coordinates
-            rel_x = tetro_x + int(dx + self.offset) + 1
-            rel_y = tetro_y + int(dy + self.offset) + 1
-
-            # Check if the block is within view bounds
-            if 0 <= rel_x <= 2 and 0 <= rel_y <= 2:
-                view[rel_x, rel_y] = 1
-
-        return tuple(view.flatten())
-    
-    #endregion
-
-    def build_agent(self, dir: Path = None, verbose: bool = False) -> Agent:
-        """Build an agent for the Tetris environment.
-        
-        Args:
-            dir (Path, optional): Directory to load prediction trees from. Defaults to None.
-            verbose (bool, optional): Verbosity flag. Defaults to False.
-        
-        Returns:
-            Agent: Agent object for the Tetris environment.
-        """
+    def build_agent(self, depth: int, dir: Path = None, verbose: bool = False) -> Agent:
+        """Build an agent for the Tetris environment."""
         agent = Agent(
             {
-                action: self.__getattribute__(action_name)
-                for action, action_name in TETRIS_ACTIONS.items()
+                0: lambda agent: self.act(0),  # Move up
+                1: lambda agent: self.act(1),  # Move left
+                2: lambda agent: self.act(2),  # Move right
+                3: lambda agent: self.act(3),  # Move down
+                4: lambda agent: self.act(4),  # Rotate clockwise
             },
             {
-                perception: self.__getattribute__(perception_name)
-                for perception, perception_name in TETRIS_PERCEPTIONS.items()
-            }
+                0: self.vision,  # Single perception method
+            },
+            depth=depth,
         )
 
         if dir:
-            if verbose:
-                print(f"Loaded prediction trees from {dir}")
-            # Load prediction trees from the specified directory
-            agent.load(dir, verbose=verbose)
+            agent.load(dir, verbose=verbose)            
             
-        if verbose:
-            print(f"Agent created with {len(agent.action_dict)} actions and {len(agent.perception_dict)} perceptions.")
-
         return agent
 
     def get_state(self) -> dict:

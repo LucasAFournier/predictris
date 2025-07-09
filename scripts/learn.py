@@ -14,6 +14,7 @@ def parse_args():
     parser.add_argument('--dir', type=str, required=False, default=None,
                         help='Directory for existing prediction trees')
     parser.add_argument('--tetrominos', type=str, required=False, nargs='+', help='List of tetrominos')
+    parser.add_argument('--depth', type=int, default=3, help='Depth of prediction trees')
     parser.add_argument('--episode', type=int, help='Maximum number of actions per episode')
     parser.add_argument('--action', type=str, choices=['from_active', 'random'], help='Action choice method')
     parser.add_argument('--activation', type=str, choices=['by_confidence', 'all'], help='Activation function')
@@ -23,42 +24,42 @@ def parse_args():
     return parser.parse_args()
 
 
-def run_episode(env: TetrisEnvironment, agent: Agent, episode: int, action_choice: str, activation: str, tetrominos: list):
+def run_episode(env: TetrisEnvironment, agent: Agent, tetrominos: list, depth: int, episode: int, action: str, activation: str, ):
     """Run a single training episode."""
-    result = 'abort'
-    while result == 'abort':
-        env.random_init(tetrominos)
-        result = agent.init_learn(action_choice, activation)
+    env.random_init(tetrominos)
+    agent.init_learn(depth, action, activation)
+    
+    # print(env.name) ##
 
-    step = 1
-    while result != 'abort' and step < episode:
-        result = agent.learn()
-        step += 1
-
-    return step
+    for step in range(episode):
+        agent.learn()
+        # print(env.state, agent.last_oa.action) ##
 
 def main():
     args = parse_args()
-    
-    dir = dir_from_params(
-        dir = f'({args.dir})' if args.dir else None,
-        tetrominos = ''.join(args.tetrominos) if args.tetrominos else None,
-        episode = args.episode,
-        action = args.action.replace('_', ''),
-        activation = args.activation.replace('_', ''),
-    )
+
+    # dir = dir_from_params(
+    #     dir = f'({args.dir})' if args.dir else None,
+    #     tetrominos = ''.join(args.tetrominos) if args.tetrominos else None,
+    #     episode = args.episode,
+    #     action = args.action.replace('_', ''),
+    #     activation = args.activation.replace('_', ''),
+    # )
+    dir = 'test'
 
     env = TetrisEnvironment()
-    agent = env.build_agent(dir=args.dir, verbose=args.verbose)
+    agent = env.build_agent(depth=args.depth, dir=args.dir, verbose=args.verbose)
     
     total_steps = 0
     last_update = time.time()
 
     with tqdm(total=args.steps, desc="Steps progress", position=0, leave=False) as pbar:
         while total_steps < args.steps:
-            total_steps += run_episode(env, agent, args.episode,
-                                       args.action, args.activation, args.tetrominos)
-            
+            run_episode(env, agent, args.tetrominos, args.depth,
+                        args.episode, args.action, args.activation)
+            total_steps += args.episode
+            # print(f'{agent.get_nodes_count()}, {len(agent.trees_by_pred)}') ##
+
             if time.time() - last_update > REFRESH_RATE:
                 pbar.n = total_steps
                 pbar.set_postfix({'nodes': agent.get_nodes_count()})

@@ -12,8 +12,6 @@ from predictris.learning.prediction_tree import (
     ObservationAction as OA,
 )
 
-from .agent_utils import is_valid
-
 
 class Agent:
     """
@@ -26,6 +24,7 @@ class Agent:
         self,
         action_dict: dict[int, Callable[["Agent"], tuple]],
         perception_dict: dict[int, Callable[["Agent"], None]],
+        depth: int,
         verbose: bool = False,
     ):
         """Initialize agent with action and perception capabilities."""
@@ -33,19 +32,7 @@ class Agent:
         self.perception_dict = perception_dict
         self.trees_by_pred = dict[tuple, PredictionTree]()
         self.verbose = verbose
-        
-    #region Interaction
-
-    def act(self, action: int = None):
-        """Execute an action in the environment.
-        
-        Args:
-            action (int, optional): Action to execute. Defaults to None.
-        """
-        if action is None and len(self.action_dict) == 1:
-            action = next(iter(self.action_dict.keys()))
-
-        self.action_dict[action](self)
+        self.depth = depth
 
     def observe(self) -> tuple:
         """Get perception from the environment.
@@ -61,100 +48,104 @@ class Agent:
                 for perception, perceive in self.perception_dict.items()
             )
         
-    #endregion
-    #region Learning
+    def init_learn(self, priming_steps: int, action_choice: str, activation: str, metrics: str = None) -> tuple:
+        """Initialize agent for learning mode."""
+        self.init_metrics(metrics)
+        
+        # self.action_choice = 'random'
+        self.action_choice = action_choice
+        self.activation = activation
+        
+        self.next_actions = deque[int]()    
+        self.active_contexts_by_pred = dict[tuple, dict[UUID, Context]]()
 
-    def init_learn(self, action_choice: str, activation: str, metrics: bool = False) -> tuple:
-        """Initialize agent for learning mode.
+        self.update(init=True, learn=False)
+        for i in range(priming_steps):
+            self.update(init=False, learn=False)
         
-        Args:
-            action_choice (str): Action choice strategy.
-            activation (str): Activation strategy.
-        
-        Returns:
-            tuple: Initial observation or 'aborted' if observation is invalid.
-        """
-        if metrics:
+    def init_metrics(self, metrics: str):
+        if metrics == 'pred_success':
             self.metrics = {
                 'preds': 0,
                 'correct_preds': 0,
             }
+        elif metrics == 'paths':
+            self.metrics = {
+                'step': 0,
+                'active_paths_by_pred': dict[tuple, dict[UUID, int]](),
+                'paths': list[tuple[int, int]](),
+            }
         else:
-            self.metrics = None
-        
-        self.action_choice = action_choice
-        self.activation = activation
-        
-        obs = self.observe()
-        self.last_oa: OA = None
-        self.next_actions = deque[int]()
-    
-        self.active_contexts_by_pred = dict[tuple, dict[UUID, Context]]()
-        
-        if not is_valid(obs):
-            return 'abort'
-        
-        self._update_current_tree(obs)
-        self._update_active_contexts(obs, None)
-        self.prev_obs = obs 
+            self.metrics = dict()
 
     def learn(self):
-        """Learn from environment interaction."""
+        """Perform a learning step."""
+        self.update(learn=True)
 
-        action, obs = self._apply_action_and_observe()
-        if not is_valid(obs):
-            return 'abort'
-
-        self._update_current_tree(obs)
-        self._update_active_contexts(obs, action)
-        self.prev_obs = obs
-
-    def _apply_action_and_observe(self):
-        action = self._get_next_action()
-        self.act(action)
-        self.last_oa = OA(self.prev_obs, action)
+    def update(self, init: bool = False, learn: bool = False):
+        """Update agent state and prediction trees."""
+        if init:
+            action: int = None
+            self.last_oa: OA = None
+        else:
+            action = self._get_next_action()
+            self.perform(action)
+            self.last_oa = OA(self.prev_obs, action)
+        
         obs = self.observe()
-
-        return action, obs
-
-    def _update_current_tree(self, obs: tuple):
+        
         # Add new tree if observation is new
-        current_tree = self.trees_by_pred.setdefault(obs, PredictionTree(obs))
+        current_tree = self.trees_by_pred.setdefault(obs, PredictionTree(obs, depth=self.depth))
         # Add new node if sequence is new
         current_tree.reinforce_correct_prediction(Context(self.last_oa, current_tree.pred_node))
 
-    def _update_active_contexts(self, obs: tuple, action: int):
         # Prepare updated active contexts
         new_active_contexts_by_pred = dict[tuple, dict[UUID, Context]]()
+        if learn and 'paths' in self.metrics:
+            new_active_paths_by_pred = dict[tuple, dict[UUID, int]]()
+            self.metrics['step'] += 1
 
         for pred, tree in self.trees_by_pred.items():
-            candidate_nodes = tree.get_nodes_from_obs(obs).copy()
+            matching_nodes = tree.get_nodes_from_obs(obs).copy()
             updated_contexts = {}
+
+            if learn and 'paths' in self.metrics:
+                updated_paths = {}
             
             # Iterate over previous active contexts
             for prev_node, context in self.active_contexts_by_pred.get(pred, {}).items():
                 # Get next node and action
                 _, next_node, other_action = next(iter(tree.out_edges(prev_node, data='action')))
                 if other_action == action:
-                    if next_node == tree.pred_node:
+                    if learn and next_node == tree.pred_node:
                         # Update prediction if next node is the prediction node
                         tree.update_prediction(
                             context,
                             correct_pred=(obs == pred),
                         )
-                        if self.metrics:
+                        if 'preds' in self.metrics:
                             self.metrics['preds'] += 1
                             self.metrics['correct_preds'] += int(obs == pred)
-
-                    elif next_node in candidate_nodes:
+                        elif 'paths' in self.metrics:
+                            start = self.metrics['active_paths_by_pred'][pred][prev_node]
+                            self.metrics['paths'].append((start, self.metrics['step']))
+                    
+                    elif next_node in matching_nodes:
                         # Transfer context to next node if it matches previous observation and action
                         updated_contexts[next_node] = context
-                        candidate_nodes.remove(next_node)
+                        matching_nodes.remove(next_node)
+
+                        if learn and 'paths' in self.metrics:
+                            # Update active paths if applicable:
+                            updated_paths[next_node] = self.metrics['active_paths_by_pred'][pred][prev_node]
 
             # Create new contexts for remaining candidate nodes
-            for node in candidate_nodes:
+            for node in matching_nodes:
                 if self.activation == 'all':
                     updated_contexts[node] = Context(self.last_oa, node)
+
+                    if learn and 'paths' in self.metrics:
+                        updated_paths[node] = self.metrics['step']
 
                 elif self.activation == 'by_confidence':
                     if random.random() < tree.nodes[node]['confidence']:
@@ -162,7 +153,17 @@ class Agent:
 
             new_active_contexts_by_pred[pred] = updated_contexts
 
+            if learn and 'paths' in self.metrics:
+                # Update active paths for the current prediction
+                new_active_paths_by_pred[pred] = updated_paths
+
         self.active_contexts_by_pred = new_active_contexts_by_pred
+
+        if learn and 'paths' in self.metrics:
+            # Update metrics for active paths
+            self.metrics['active_paths_by_pred'] = new_active_paths_by_pred
+        
+        self.prev_obs = obs
                     
     def _get_next_action(self) -> int:
         """Get next action."""
@@ -173,8 +174,7 @@ class Agent:
     def _choose_actions(self):
         """Choose next actions."""
         if self.action_choice == 'from_active':
-            active_nodes = self._get_active_nodes()
-            if active_nodes:
+            if (active_nodes := self._get_active_nodes()):
                 pred, node = random.choice(active_nodes)
                 tree = self.trees_by_pred[pred]
                 self.next_actions.extend(tree.get_actions_to_pred(node))
@@ -191,8 +191,6 @@ class Agent:
             for node in contexts:
                 active.append((pred, node))
         return active
-
-    #endregion
     
     def load(self, dir: Path, verbose: bool = False):
         """Load agent with prediction trees from a directory."""
@@ -201,8 +199,8 @@ class Agent:
             
         filepaths = glob.glob(str(dir / "*.gpickle"))
         for filepath in tqdm(filepaths, desc="Loading trees", leave=False):
-            tree = PredictionTree.load(filepath)
-            self.trees_by_pred[tree.pred] = tree
+            tree = PredictionTree.load(Path(filepath))
+            self.trees_by_pred[tree.pred_obs] = tree
             
         if verbose:
             print(f"Loaded {len(filepaths)} trees from {dir}")
@@ -239,3 +237,7 @@ class Agent:
             )
         
         return sum(len(tree) for tree in self.trees_by_pred.values())
+    
+    def perform(self, action: int):
+        """Perform an action using the action dictionary."""
+        self.action_dict[action](self)

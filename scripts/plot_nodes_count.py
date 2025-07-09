@@ -10,7 +10,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Plot nodes count data from CSV files')
     parser.add_argument('--dirs', type=str, nargs='+', required=True,
                        help='List of experiment directories to compare')
-    parser.add_argument('--output', type=str, help='Output file path for saving the plot')
+    parser.add_argument('--output', type=str, required=False, help='Output file path for saving the plot')
     return parser.parse_args()
 
 
