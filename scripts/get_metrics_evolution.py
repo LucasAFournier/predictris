@@ -4,13 +4,14 @@ import csv
 from tqdm import tqdm
 import os
 
-from predictris.agent import Agent
+from predictris.agent import Agent, PredMetric, BestPredErrorRate, TimePerStepMetric
 from predictris.tetris import TetrisEnvironment
 from predictris.utils import dir_from_params
 
 
 NUM_MEASUREMENTS = 100
 CONFIDENCE_THRESHOLD = 0.95
+TEST_EPISODE_LENGTH = 10
 
 
 def parse_args():
@@ -30,29 +31,30 @@ def parse_args():
     return parser.parse_args()
 
 
-def run_episode(env: TetrisEnvironment, agent: Agent, tetrominos: list, depth: int, episode: int, action: str, activation: str):
+def train_episode(env: TetrisEnvironment, agent: Agent, tetrominos: list, episode: int, action: str, activation: str):
     """Run a single training episode."""
     env.random_init(tetrominos)
-    agent.init_learn(depth, action, activation, metrics="pred_success")
+    agent.init_episode(action, activation)
 
-    start = time.time()
-    for step in range(episode):
-        agent.learn()
+    for _ in range(episode):
+        agent.update(learn=True)
 
-    return time.time() - start, agent.metrics['preds'], agent.metrics['correct_preds']
+
+def test_episode(env: TetrisEnvironment, agent: Agent, tetrominos: list):
+    """Run a single test episode and collect metrics by step depth."""
+    env.random_init(tetrominos)
+    agent.init_episode(action_choice="random", activation="all")
+ 
+    for _ in range(TEST_EPISODE_LENGTH):
+        agent.update(test=True)
 
 
 def collect_data(env: TetrisEnvironment, agent: Agent, args, pbar):
     """Collect nodes count data during training."""
     total_steps = 0
-    steps_since_update = 0
-    time_since_update = 0
-    preds_since_update = 0
-    correct_preds_since_update = 0
 
     steps = []
     time_per_step = []
-    pred_success = []
     nodes = []
     filtered = []
 
@@ -60,45 +62,46 @@ def collect_data(env: TetrisEnvironment, agent: Agent, args, pbar):
     next_update = update_interval
 
     while total_steps < args.steps:
-        learn_time, preds, correct_preds = run_episode(env, agent, args.tetrominos, args.depth, args.episode,
-                                                       args.action, args.activation)
+        train_episode(env, agent, args.tetrominos, args.episode,
+                      args.action, args.activation)
         total_steps += args.episode
-        steps_since_update += args.episode
-        time_since_update += learn_time
-        preds_since_update += preds
-        correct_preds_since_update += correct_preds
 
         if total_steps >= next_update:
             steps.append(total_steps)
-            time_per_step.append(round(time_since_update / steps_since_update, 4))
-            pred_success.append(
-                round(correct_preds_since_update / preds_since_update, 4)
-                if preds_since_update != 0 else 0.0
-            )
+            
+            time_per_step.append(agent.metrics[TimePerStepMetric].result())
+            test_episode(env, agent, args.tetrominos)
+            agent.metrics[TimePerStepMetric].reset()
+
             nodes.append(agent.get_nodes_count())
             filtered.append(agent.get_nodes_count(filter=CONFIDENCE_THRESHOLD))
             
             next_update += update_interval
-            steps_since_update = 0
-            time_since_update = 0
-            preds_since_update = 0
-            correct_preds_since_update = 0
             pbar.n = total_steps
             pbar.set_postfix({'nodes': nodes[-1], 'filtered': filtered[-1]})
             pbar.refresh()
 
-    return steps, time_per_step, pred_success, nodes, filtered
+    results = {
+        'steps': steps,
+        'time_per_step': time_per_step,
+        'best_pred_error_rate': agent.metrics[BestPredErrorRate].result(),
+        'nodes': nodes,
+        'filtered': filtered
+    }
+    agent.metrics[BestPredErrorRate].reset()
+
+    return results
 
 
-def save_history(rows, rep, dir):
+def save_history(result, rep, dir):
     """Save history data to CSV file."""    
     file = f"plots/{dir}/{rep}.csv"
     os.makedirs(os.path.dirname(file), exist_ok=True)
     
     with open(file, 'w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(['steps', 'time_per_step', 'pred_success', 'nodes', 'filtered_nodes'])
-        writer.writerows(rows)
+        writer.writerow(result.keys())
+        writer.writerows(zip(*result.values()))
 
 
 def main():
@@ -106,7 +109,7 @@ def main():
     # Initialize histories as lists of lists
     steps_hist = []
     time_per_step_hist = []
-    pred_success_hist = []
+    best_pred_error_rate_hist = []
     nodes_hist = []
     filtered_hist = []
 
@@ -121,25 +124,25 @@ def main():
 
     for rep in range(args.reps):
         env = TetrisEnvironment()
-        agent = env.build_agent(depth=args.depth, dir=args.dir, verbose=args.verbose)
+        agent = env.build_agent(depth=args.depth, dir=args.dir, verbose=args.verbose, metrics=["best_pred", "time_per_step"])
 
         with tqdm(total=args.steps, desc=f"[{rep + 1}/{args.reps}] {dir}", position=0, leave=args.verbose) as pbar:
-            steps, time_per_step, pred_success, nodes, filtered = collect_data(env, agent, args, pbar)
+            result = collect_data(env, agent, args, pbar)
 
         if args.save:
-            save_history(zip(steps, time_per_step, pred_success, nodes, filtered), rep, dir)
-            
+            save_history(result, rep, dir)
+
         # Append each run's data to respective histories
-        steps_hist.append(steps)
-        time_per_step_hist.append(time_per_step)
-        pred_success_hist.append(pred_success)
-        nodes_hist.append(nodes)
-        filtered_hist.append(filtered)
+        steps_hist.append(result['steps'])
+        time_per_step_hist.append(result['time_per_step'])
+        best_pred_error_rate_hist.append(result['best_pred_error_rate'])
+        nodes_hist.append(result['nodes'])
+        filtered_hist.append(result['filtered'])
 
     if args.plot:
         from predictris.plot import plot_nodes_data
-        histories = [(steps_hist, time_per_step_hist, pred_success_hist, nodes_hist, filtered_hist)]
-        plot_nodes_data(histories, dir, 
+        histories = [(steps_hist, time_per_step_hist, best_pred_error_rate_hist, nodes_hist, filtered_hist)]
+        plot_nodes_data(histories, dir,
                        [])
 
 

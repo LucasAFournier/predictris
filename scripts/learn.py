@@ -32,7 +32,7 @@ def run_episode(env: TetrisEnvironment, agent: Agent, tetrominos: list, depth: i
     # print(env.name) ##
 
     for step in range(episode):
-        agent.learn()
+        agent.update(learn=True)
         # print(env.state, agent.last_oa.action) ##
 
 def main():

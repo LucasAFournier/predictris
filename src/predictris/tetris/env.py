@@ -77,7 +77,7 @@ class TetrisEnvironment:
         except KeyError:
             pass # Invalid action, do nothing
 
-    def build_agent(self, depth: int, dir: Path = None, verbose: bool = False) -> Agent:
+    def build_agent(self, depth: int, dir: Path = None, metrics: list[str] | None = None, verbose: bool = False) -> Agent:
         """Build an agent for the Tetris environment."""
         agent = Agent(
             {
@@ -91,6 +91,7 @@ class TetrisEnvironment:
                 0: self.vision,  # Single perception method
             },
             depth=depth,
+            metrics=metrics,
         )
 
         if dir:

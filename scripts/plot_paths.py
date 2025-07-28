@@ -8,7 +8,7 @@ import seaborn as sns
 from collections import Counter
 import numpy as np
 
-from predictris.agent import Agent
+from predictris.agent import Agent, PathsMetric
 from predictris.tetris import TetrisEnvironment
 
 
@@ -18,6 +18,7 @@ def parse_args():
                         help='Directory for existing prediction trees')
     # parser.add_argument('--output', type=str)
     parser.add_argument('--tetrominos', type=str, required=False, nargs='+', help='List of tetrominos')
+    parser.add_argument('--depth', type=int, default=3, help='Depth of prediction trees')
     parser.add_argument('--episode', type=int, help='Maximum number of actions per episode')
     parser.add_argument('--action', type=str, choices=['from_active', 'random'], help='Action choice method')
     parser.add_argument('--activation', type=str, choices=['by_confidence', 'all'], help='Activation function')
@@ -28,17 +29,14 @@ def parse_args():
 
 def run_episode(env: TetrisEnvironment, agent: Agent, episode: int, action_choice: str, activation: str, tetrominos: list):
     """Run a single training episode."""
-    result = 'abort'
-    while result == 'abort':
-        env.random_init(tetrominos)
-        result = agent.init_learn(action_choice, activation, metrics='paths')
-
-    step = 1
-    while result != 'abort' and step < episode:
-        result = agent.learn()
-        step += 1
-
-    return step, agent.metrics['paths']
+    env.random_init(tetrominos)
+    # Initialize with 1 priming step
+    agent.init_learn(priming_steps=1, action_choice=action_choice, activation=activation, metrics='paths')
+    
+    for i in range(episode):
+        agent.update(learn=True)
+        
+    return agent.metrics[PathsMetric].paths
 
 def calculate_path_overlap(path1, path2):
     """Calculate the length of overlap between two paths.
@@ -86,18 +84,18 @@ def main():
     args = parse_args()
 
     env = TetrisEnvironment()
-    agent = env.build_agent(dir=Path("results", args.input), verbose=args.verbose)
+    agent = env.build_agent(depth=args.depth, dir=Path("results", args.input), verbose=args.verbose)
 
     total_steps = 0
     episode_overlaps = []
 
     with tqdm(total=args.steps, desc="Steps progress", position=0, leave=False) as pbar:
         while total_steps < args.steps:
-            steps, paths = run_episode(env, agent, args.episode,
+            paths = run_episode(env, agent, args.episode,
                                     args.action, args.activation, args.tetrominos)
-            total_steps += steps
+            total_steps += args.episode
             
-            # Calculate maximum overlap for this episode
+            # Calculate maximum overlap for this episode's completed paths
             max_overlap = get_episode_max_overlap(paths)
             episode_overlaps.append(max_overlap)
 

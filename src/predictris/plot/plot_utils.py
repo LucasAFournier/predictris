@@ -24,7 +24,7 @@ def plot_nodes_data(histories, title, legends, output_path=None, bar_width=0.4):
     fig.suptitle(title, y=0.95)  # Reduced padding between title and plots
     
     for i, (hist, color) in enumerate(zip(histories, colors)):
-        steps, time_per_step, pred_success, nodes, filtered = hist
+        steps, time_per_step, best_pred_error_rate, nodes, filtered = hist
         legend = legends[i] if legends else None
 
         # Plot steps data
@@ -34,7 +34,7 @@ def plot_nodes_data(histories, title, legends, output_path=None, bar_width=0.4):
         plot_means(axes[0], steps_x, nodes, steps, color, legend, bounds=True)
         plot_means(axes[1], steps_x, filtered, steps, color, legend, bounds=True)
         plot_means(axes[2], steps_x, time_per_step, steps, color, legend)
-        plot_means(axes[3], steps_x, pred_success, steps, color, legend)
+        plot_means(axes[3], steps_x, best_pred_error_rate, steps, color, legend)
 
         # # Calculate and plot average prediction success rate as bar
         # avg_success = np.mean([np.mean(ps) for ps in pred_success])
@@ -54,12 +54,14 @@ def plot_nodes_data(histories, title, legends, output_path=None, bar_width=0.4):
     axes[0].set_ylabel('Total Nodes Count')
     axes[1].set_ylabel('Filtered Nodes Count')
     axes[2].set_ylabel('Time per Step (s)')
-    axes[3].set_ylabel('Prediction Success Rate')
-    
+    axes[3].set_ylabel('Best Prediction Error Rate')
+
     axes[0].set_ylim(bottom=0)
     axes[1].set_ylim(bottom=0)
     axes[2].set_ylim(bottom=0)
     axes[3].set_ylim(0, 1)
+    # axes[3].set_ylim(bottom=0)
+    # axes[3].set_yscale('log')
 
     if legends:
         axes[0].legend(loc='lower right')
@@ -79,6 +81,7 @@ def plot_nodes_data(histories, title, legends, output_path=None, bar_width=0.4):
 
 def plot_means(ax, x, y_data, x_data=None, color=None, label=None, bounds=False):
     """Plot mean with min/max bounds for given data."""
+    print([(len(x_src), len(y)) for (x_src, y) in zip(x_data, y_data) if x_data is not None])
     if x_data is not None:
         y_interpolated = [np.interp(x, x_src, y) for x_src, y in zip(x_data, y_data)]
     else:
