@@ -1,2 +1,2 @@
 from .agent import Agent
-from .metrics import PathsMetric, PredMetric, BestPredErrorRate, TimePerStepMetric
+from .metrics import PathsMetric, PredMetric, BestPredErrorRate, TimePerLearnStep

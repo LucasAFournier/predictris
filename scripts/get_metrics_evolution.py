@@ -4,14 +4,15 @@ import csv
 from tqdm import tqdm
 import os
 
-from predictris.agent import Agent, PredMetric, BestPredErrorRate, TimePerStepMetric
+from predictris.agent import Agent, PredMetric, BestPredErrorRate, TimePerLearnStep
 from predictris.tetris import TetrisEnvironment
 from predictris.utils import dir_from_params
 
 
 NUM_MEASUREMENTS = 100
 CONFIDENCE_THRESHOLD = 0.95
-TEST_EPISODE_LENGTH = 10
+TEST_EPISODE_LENGTH = 4
+TEST_EPISODES = 10
 
 
 def parse_args():
@@ -31,50 +32,51 @@ def parse_args():
     return parser.parse_args()
 
 
-def train_episode(env: TetrisEnvironment, agent: Agent, tetrominos: list, episode: int, action: str, activation: str):
-    """Run a single training episode."""
+def learn_episode(env: TetrisEnvironment, agent: Agent, tetrominos: list, episode: int, action: str, activation: str):
+    """Run a single learning episode."""
     env.random_init(tetrominos)
-    agent.init_episode(action, activation)
+    agent.init_learn_episode(action, activation)
 
     for _ in range(episode):
-        agent.update(learn=True)
+        agent.learn()
 
 
 def test_episode(env: TetrisEnvironment, agent: Agent, tetrominos: list):
     """Run a single test episode and collect metrics by step depth."""
     env.random_init(tetrominos)
-    agent.init_episode(action_choice="random", activation="all")
+    agent.init_test_episode()
  
     for _ in range(TEST_EPISODE_LENGTH):
-        agent.update(test=True)
+        agent.test()
 
 
 def collect_data(env: TetrisEnvironment, agent: Agent, args, pbar):
-    """Collect nodes count data during training."""
+    """Collect nodes count data during learning."""
     total_steps = 0
 
     steps = []
     time_per_step = []
     nodes = []
     filtered = []
+    best_pred_error_rate = []
 
     update_interval = args.steps / NUM_MEASUREMENTS
     next_update = update_interval
 
     while total_steps < args.steps:
-        train_episode(env, agent, args.tetrominos, args.episode,
+        learn_episode(env, agent, args.tetrominos, args.episode,
                       args.action, args.activation)
         total_steps += args.episode
 
         if total_steps >= next_update:
             steps.append(total_steps)
-            
-            time_per_step.append(agent.metrics[TimePerStepMetric].result())
-            test_episode(env, agent, args.tetrominos)
-            agent.metrics[TimePerStepMetric].reset()
-
+            time_per_step.append(agent.metrics[TimePerLearnStep].result())
             nodes.append(agent.get_nodes_count())
-            filtered.append(agent.get_nodes_count(filter=CONFIDENCE_THRESHOLD))
+            filtered.append(agent.get_nodes_count(filter=CONFIDENCE_THRESHOLD))            
+
+            for _ in range(TEST_EPISODES):
+                test_episode(env, agent, args.tetrominos)
+            best_pred_error_rate.append(agent.metrics[BestPredErrorRate].result())
             
             next_update += update_interval
             pbar.n = total_steps
@@ -84,11 +86,10 @@ def collect_data(env: TetrisEnvironment, agent: Agent, args, pbar):
     results = {
         'steps': steps,
         'time_per_step': time_per_step,
-        'best_pred_error_rate': agent.metrics[BestPredErrorRate].result(),
+        'best_pred_error_rate': best_pred_error_rate,
         'nodes': nodes,
         'filtered': filtered
     }
-    agent.metrics[BestPredErrorRate].reset()
 
     return results
 

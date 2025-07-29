@@ -18,7 +18,7 @@ from predictris.learning.prediction_tree import (
 )
 
 # centralised metrics hub -------------------------------------------------
-from .metrics import MetricsRegistry, PathsMetric, PredMetric, BestPredErrorRate, TimePerStepMetric
+from .metrics import MetricsRegistry, PathsMetric, PredMetric, BestPredErrorRate, TimePerLearnStep
 
 
 class Agent:
@@ -47,7 +47,7 @@ class Agent:
             "paths": PathsMetric,
             "pred": PredMetric,
             "best_pred": BestPredErrorRate,
-            "time_per_step": TimePerStepMetric,
+            "time_per_step": TimePerLearnStep,
             None: None,
         }
         if metrics:
@@ -69,7 +69,7 @@ class Agent:
     def perform(self, action: int):
         self.action_dict[action](self)
 
-    def init_episode(
+    def init_learn_episode(
         self,
         action_choice: str,
         activation: str,
@@ -79,86 +79,17 @@ class Agent:
         self.activation = activation                # 'all' | 'by_confidence'
 
         # update -----------------------------------------------------------
-        self.update(init=True)
-
-        self._metrics.emit("episode")
-
-    def update(self):        
-        action: int = None
-        self.last_oa: OA = None        
-        
-        # ---------- perceive ---------------------------------------------
         obs = self.observe()
-
-        tree = self.trees_by_pred.setdefault(obs, PredictionTree(obs, depth=self.depth))
-        tree.reinforce_correct_prediction(Context(self.last_oa, tree.pred_node))
-
-        # ---------- context propagation ----------------------------------
-        new_active: dict[tuple, dict[UUID, Context]] = {}
-
-        for pred, tree in self.trees_by_pred.items():
-            matching = tree.get_nodes_from_obs(obs).copy()
-            updated: dict[UUID, Context] = {}
-
-            for prev_node, ctx in self.active_contexts_by_pred.get(pred, {}).items():
-                _, next_node, edge_action = next(
-                    iter(tree.out_edges(prev_node, data="action"))
-                )
-                if edge_action != action:
-                    continue
-
-                # reached prediction node => evaluate
-                if next_node == tree.pred_node:
-                    correct = (obs == pred)
-                    if learn:
-                        tree.update_prediction(ctx, correct_pred=correct)                    
-                    elif test:
-                        self._metrics.emit("path_close", pred=pred, node=prev_node)
-                        if tree.nodes[ctx.node].get("confident", False):
-                            confidence = tree.nodes[ctx.node]["confidence"]
-                            self._metrics.emit("prediction", correct=correct, confidence=confidence)                        
-
-                # ordinary transition
-                elif next_node in matching:
-                    updated[next_node] = ctx
-                    matching.remove(next_node)
-                    if test:
-                        self._metrics.emit(
-                            "path_transfer",
-                            pred=pred,
-                            from_node=prev_node,
-                            to_node=next_node,
-                        )
-
-            # spawn new contexts
-            for node in matching:
-                if self.activation == "all" or (
-                    self.activation == "by_confidence"
-                    and random.random() < tree.nodes[node]["confidence"]
-                ):
-                    updated[node] = Context(self.last_oa, node)
-                    if test:
-                        self._metrics.emit("path_open", pred=pred, node=node)
-
-            new_active[pred] = updated
-
-        self.active_contexts_by_pred = new_active
+        self.trees_by_pred.setdefault(obs, PredictionTree(obs, depth=self.depth))
         self.prev_obs = obs
 
-        # ---------- metrics step -----------------------------------------
-        self._metrics.emit("step", time=time.time() - start)
-
-    def update(self, init: bool = False, learn: bool = False, test: bool = False):
+    def learn(self):
         start = time.time()
         
         # ---------- act ---------------------------------------------------
-        if init:
-            action: int = None
-            self.last_oa: OA = None        
-        else:
-            action = self._get_next_action()
-            self.perform(action)
-            self.last_oa = OA(self.prev_obs, action)
+        action = self._get_next_action()
+        self.perform(action)
+        self.last_oa = OA(self.prev_obs, action)
 
         # ---------- perceive ---------------------------------------------
         obs = self.observe()
@@ -183,25 +114,12 @@ class Agent:
                 # reached prediction node => evaluate
                 if next_node == tree.pred_node:
                     correct = (obs == pred)
-                    if learn:
-                        tree.update_prediction(ctx, correct_pred=correct)                    
-                    elif test:
-                        self._metrics.emit("path_close", pred=pred, node=prev_node)
-                        if tree.nodes[ctx.node].get("confident", False):
-                            confidence = tree.nodes[ctx.node]["confidence"]
-                            self._metrics.emit("prediction", correct=correct, confidence=confidence)                        
+                    tree.update_prediction(ctx, correct_pred=correct)                       
 
                 # ordinary transition
                 elif next_node in matching:
                     updated[next_node] = ctx
                     matching.remove(next_node)
-                    if test:
-                        self._metrics.emit(
-                            "path_transfer",
-                            pred=pred,
-                            from_node=prev_node,
-                            to_node=next_node,
-                        )
 
             # spawn new contexts
             for node in matching:
@@ -210,8 +128,6 @@ class Agent:
                     and random.random() < tree.nodes[node]["confidence"]
                 ):
                     updated[node] = Context(self.last_oa, node)
-                    if test:
-                        self._metrics.emit("path_open", pred=pred, node=node)
 
             new_active[pred] = updated
 
@@ -219,7 +135,81 @@ class Agent:
         self.prev_obs = obs
 
         # ---------- metrics step -----------------------------------------
-        self._metrics.emit("step", time=time.time() - start)
+        self._metrics.emit("learn_step", time=time.time() - start)
+
+    def init_test_episode(self):
+        """Prime the agent and reset metrics."""
+        self.action_choice = "random"
+        self.activation = "all"
+
+        # update -----------------------------------------------------------
+        obs = self.observe()
+        self.trees_by_pred.setdefault(obs, PredictionTree(obs, depth=self.depth))
+        self.prev_obs = obs
+
+        self._metrics.emit("test_episode")
+
+    def test(self):
+        # ---------- act ---------------------------------------------------
+        action = self._get_next_action()
+        self.perform(action)
+        self.last_oa = OA(self.prev_obs, action)
+
+        # ---------- perceive ---------------------------------------------
+        obs = self.observe()
+
+        tree = self.trees_by_pred.setdefault(obs, PredictionTree(obs, depth=self.depth))
+        tree.reinforce_correct_prediction(Context(self.last_oa, tree.pred_node))
+
+        # ---------- context propagation ----------------------------------
+        new_active: dict[tuple, dict[UUID, Context]] = {}
+
+        for pred, tree in self.trees_by_pred.items():
+            matching = tree.get_nodes_from_obs(obs).copy()
+            updated: dict[UUID, Context] = {}
+
+            for prev_node, ctx in self.active_contexts_by_pred.get(pred, {}).items():
+                _, next_node, edge_action = next(
+                    iter(tree.out_edges(prev_node, data="action"))
+                )
+                if edge_action != action:
+                    continue
+
+                # reached prediction node => evaluate
+                if next_node == tree.pred_node:
+                    correct = (obs == pred)
+                    self._metrics.emit("path_close", pred=pred, node=prev_node)
+                    if tree.nodes[ctx.node].get("confident", False):
+                        confidence = tree.nodes[ctx.node]["confidence"]
+                        self._metrics.emit("prediction", correct=correct, confidence=confidence)                        
+
+                # ordinary transition
+                elif next_node in matching:
+                    updated[next_node] = ctx
+                    matching.remove(next_node)
+                    self._metrics.emit(
+                        "path_transfer",
+                        pred=pred,
+                        from_node=prev_node,
+                        to_node=next_node,
+                    )
+
+            # spawn new contexts
+            for node in matching:
+                if self.activation == "all" or (
+                    self.activation == "by_confidence"
+                    and random.random() < tree.nodes[node]["confidence"]
+                ):
+                    updated[node] = Context(self.last_oa, node)
+                    self._metrics.emit("path_open", pred=pred, node=node)
+
+            new_active[pred] = updated
+
+        self.active_contexts_by_pred = new_active
+        self.prev_obs = obs
+
+        # ---------- metrics step -----------------------------------------
+        self._metrics.emit("test_step")
 
     def _get_next_action(self) -> int:
         if not self.next_actions:

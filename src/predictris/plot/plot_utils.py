@@ -34,7 +34,18 @@ def plot_nodes_data(histories, title, legends, output_path=None, bar_width=0.4):
         plot_means(axes[0], steps_x, nodes, steps, color, legend, bounds=True)
         plot_means(axes[1], steps_x, filtered, steps, color, legend, bounds=True)
         plot_means(axes[2], steps_x, time_per_step, steps, color, legend)
-        plot_means(axes[3], steps_x, best_pred_error_rate, steps, color, legend)
+        # Plot each key in best_pred_error_rate dictionaries
+        if best_pred_error_rate:
+            keys = {
+                1: '-',
+                2: '--',
+                3: ':',
+            }
+
+            for key, style in keys.items():
+                # Extract values for this key from all dictionaries
+                values = [[d.get(key, 0) for d in error_dict_list] for error_dict_list in best_pred_error_rate]
+                plot_means(axes[3], steps_x, values, steps, color, style, f"{legend} (key={key})" if legend else f"key={key}")
 
         # # Calculate and plot average prediction success rate as bar
         # avg_success = np.mean([np.mean(ps) for ps in pred_success])
@@ -79,9 +90,8 @@ def plot_nodes_data(histories, title, legends, output_path=None, bar_width=0.4):
     plt.show()
 
 
-def plot_means(ax, x, y_data, x_data=None, color=None, label=None, bounds=False):
+def plot_means(ax, x, y_data, x_data=None, color=None, style='-', label=None, bounds=False):
     """Plot mean with min/max bounds for given data."""
-    print([(len(x_src), len(y)) for (x_src, y) in zip(x_data, y_data) if x_data is not None])
     if x_data is not None:
         y_interpolated = [np.interp(x, x_src, y) for x_src, y in zip(x_data, y_data)]
     else:
@@ -90,7 +100,7 @@ def plot_means(ax, x, y_data, x_data=None, color=None, label=None, bounds=False)
     y_array = np.array(y_interpolated)
     mean = np.mean(y_array, axis=0)
     
-    ax.plot(x, mean, '-', color=color, label=label, linewidth=2)
+    ax.plot(x, mean, linestyle=style, color=color, label=label, linewidth=2)
     
     if bounds:
         min_y = np.min(y_array, axis=0)

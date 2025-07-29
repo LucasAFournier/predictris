@@ -58,7 +58,7 @@ class PathsMetric:
     paths = list[tuple[int, int]]()
     active_paths_by_pred = dict[tuple, dict[UUID, int]]()
 
-    def on_step(self, time: float) -> None:
+    def on_test_step(self) -> None:
         self.step += 1
 
     def on_path_open(self, *, pred: tuple, node: UUID) -> None:
@@ -91,18 +91,17 @@ class BestPredErrorRate:
             self.current_best_conf = confidence
             self.current_best_pred = correct
 
-    def on_step(self, time: float) -> None:
+    def on_test_step(self) -> None:
         self.best_preds[self.step] = self.best_preds.get(self.step, 0) + int(self.current_best_pred)
         self.current_best_conf = 0.0
         self.current_best_pred = False
         self.step += 1
 
-    def on_episode(self) -> None:
+    def on_test_episode(self) -> None:
         self.episodes += 1
         self.step = 0
 
     def reset(self) -> None:
-        """Reset the metric for a new run."""
         self.step = 0
         self.episodes = 0
         self.best_preds.clear()
@@ -110,22 +109,26 @@ class BestPredErrorRate:
         self.current_best_pred = False
 
     def result(self) -> float:
-        return {
-            step: round(1 - self.best_preds[step] / self.episodes, 4)
+        result = {
+            step: round((self.episodes - self.best_preds[step])/ self.episodes, 4)
             for step in self.best_preds
         }
+        self.reset()
+        return result
 
 
 @dataclass
-class TimePerStepMetric:
+class TimePerLearnStep:
     """Records time spent per step."""
     times = list[float]()
 
-    def on_step(self, time: float) -> None:
+    def on_learn_step(self, time: float) -> None:
         self.times.append(time)
 
     def reset(self) -> None:
         self.times.clear()
 
     def result(self) -> float:
-        return round(sum(self.times) / len(self.times), 4)
+        result = round(sum(self.times) / len(self.times), 4)
+        self.reset()
+        return result
