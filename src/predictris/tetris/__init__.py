@@ -1,2 +1,1 @@
-from .env import TetrisEnvironment
-from .constants import TETRIS_ACTIONS, TETROMINO_NAMES
+from .env import TetrisEnvironment, TETRIS_ACTIONS

@@ -5,8 +5,6 @@ from typing import NamedTuple
 from uuid import UUID, uuid4
 import networkx as nx
 
-from .learning_utils import filename_from_obs, init_node_metrics, update_node_metrics
-
 
 Observation = tuple
 Action = int
@@ -96,7 +94,6 @@ class PredictionTree(nx.DiGraph):
         except:
             pass
 
-
     def _reinforce(self, obs: Observation, level: int) -> UUID:
         """Add a new node to the tree and return its identifier."""
         obs = self._cache.get(obs)
@@ -125,3 +122,23 @@ class PredictionTree(nx.DiGraph):
 
         with open(filepath, "rb") as f:
             return pickle.load(f)
+        
+
+def filename_from_obs(obs: tuple):
+    """Create a filename from an observation."""
+    return "_".join(str(x) for x in obs)
+
+
+def init_node_metrics():
+    return {
+        "eval_count": 0,
+        "correct_count": 0,
+        "confidence": 0.5,
+    }
+
+
+def update_node_metrics(node, correct_pred: bool):
+    node["eval_count"] += 1
+    if correct_pred:
+        node["correct_count"] += 1
+    node["confidence"] = (node["correct_count"] + 1) / (node["eval_count"] + 2)

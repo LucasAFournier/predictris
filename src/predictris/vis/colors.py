@@ -6,8 +6,7 @@ COLORS = {
 }
 
 DECORATION_COLORS = {
-    "grid": (255, 255, 255),  # White gridlines
-    "view_border": (255, 255, 0),  # Yellow border for viewing window
+    "grid": (255, 255, 255),
 }
 
 def rgbint_to_rgb(color):

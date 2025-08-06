@@ -18,7 +18,7 @@ from predictris.learning.prediction_tree import (
 )
 
 # centralised metrics hub -------------------------------------------------
-from .metrics import MetricsRegistry, PathsMetric, PredMetric, BestPredErrorRate, TimePerLearnStep
+from .metrics import MetricsRegistry
 
 
 class Agent:
@@ -42,21 +42,13 @@ class Agent:
         self.active_contexts_by_pred: dict[tuple, dict[UUID, Context]] = {}
 
         # ---------- metrics initialization --------------------------------
-        self._metrics: MetricsRegistry = MetricsRegistry()
-        metric_map = {
-            "paths": PathsMetric,
-            "pred": PredMetric,
-            "best_pred": BestPredErrorRate,
-            "time_per_step": TimePerLearnStep,
-            None: None,
-        }
+        self._metrics: MetricsRegistry = MetricsRegistry(self)
         if metrics:
             for metric in metrics:
-                if metric_cls := metric_map.get(metric):
-                    self._metrics.register(metric_cls())
+                self._metrics.register(metric)
 
     @property
-    def metrics(self) -> dict[str, object]:
+    def metrics(self) -> MetricsRegistry:
         return self._metrics
 
     def observe(self) -> tuple:
@@ -69,13 +61,9 @@ class Agent:
     def perform(self, action: int):
         self.action_dict[action](self)
 
-    def init_learn_episode(
-        self,
-        action_choice: str,
-        activation: str,
-    ):
+    def init_learn_episode(self, action: str, activation: str):
         """Prime the agent and reset metrics."""
-        self.action_choice = action_choice          # 'random' | 'from_active'
+        self.action_choice = action          # 'random' | 'from_active'
         self.activation = activation                # 'all' | 'by_confidence'
 
         # update -----------------------------------------------------------
@@ -137,10 +125,10 @@ class Agent:
         # ---------- metrics step -----------------------------------------
         self._metrics.emit("learn_step", time=time.time() - start)
 
-    def init_test_episode(self):
+    def init_test_episode(self, action_choice: str, activation: str):
         """Prime the agent and reset metrics."""
-        self.action_choice = "random"
-        self.activation = "all"
+        self.action_choice = action_choice
+        self.activation = activation
 
         # update -----------------------------------------------------------
         obs = self.observe()
@@ -251,17 +239,3 @@ class Agent:
             print(f"\nSaving trees to {dir}")
         for tree in self.trees_by_pred.values():
             tree.save(dir)
-
-    def get_nodes_count(self, filter: float | None = None) -> int:
-        if filter is not None:
-            return sum(
-                len(
-                    [
-                        n
-                        for n, conf in tree.nodes(data="confidence", default=0.0)
-                        if conf > filter
-                    ]
-                )
-                for tree in self.trees_by_pred.values()
-            )
-        return sum(len(t) for t in self.trees_by_pred.values())

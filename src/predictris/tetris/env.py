@@ -5,7 +5,19 @@ import csv
 
 from predictris.agent import Agent
 
-from .constants import TETROMINO_NAMES
+
+TETROMINO_NAMES = ["T", "J", "I", "O", "L", "Z", "S"]
+TETRIS_ACTIONS = {
+    0: "move_tetromino_up",
+    1: "move_tetromino_left",
+    2: "move_tetromino_right",
+    3: "move_tetromino_down",
+    4: "rotate_tetromino_cw",
+}
+TETRIS_PERCEPTIONS = {
+    0: "vision",
+}
+
 
 # Load valid states and create lookup
 VALID_STATES = {}
@@ -98,23 +110,3 @@ class TetrisEnvironment:
             agent.load(dir, verbose=verbose)            
             
         return agent
-
-    def get_state(self) -> dict:
-        """Returns the current tetromino state as a dictionary.
-        
-        Returns:
-            dict: Dictionary representation of the Tetromino state        
-        """
-        return {
-            "name": self.name,
-            "position": self.position,
-            "orientation": self.orientation,
-        }
-
-    def from_state(self, state: dict):
-        """Creates a new tetromino from state.
-
-        Args:
-            state (dict): Dictionary representation of the Tetromino state
-        """
-        return self.__init__(**state)
