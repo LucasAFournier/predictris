@@ -11,7 +11,6 @@ from predictris.tetris import TETRIS_ACTIONS
 from predictris.learning import PredictionTree
 
 from .image_handler import ImageHandler
-from .vis_utils import confidence_score_to_color
 
 
 TREE_CONFIG = """
@@ -164,3 +163,19 @@ class PredictionTreeRenderer(Network):
             'confidences': confidences,
             'max_depth': max(level_counts, default=0),
         }
+    
+
+def confidence_score_to_color(confidence: float) -> str:
+    """Convert confidence score to color hex code (red -> yellow -> green gradient)."""
+    if confidence <= 0.5:
+        # Red to yellow
+        ratio = confidence * 2  # 0-0.5 to 0-1
+        green = int(255 * ratio)
+        red = 255
+    else:
+        # Yellow to green
+        ratio = (confidence - 0.5) * 2  # 0.5-1 to 0-1
+        green = 255
+        red = int(255 * (1 - ratio))
+    
+    return f'#{red:02x}{green:02x}00'

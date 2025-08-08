@@ -18,7 +18,7 @@ class HistogramGenerator:
     def generate_confidence_histogram(confidences: list) -> str:
         """Generate a histogram for confidence score distribution."""
         fig = plt.figure(figsize=(4, 2))
-        plt.hist(confidences, bins=20, range=(0, 1))
+        plt.hist(confidences, bins=50, range=(0, 1))
         plt.xticks([0, 0.5, 1], ['0', '0.5', '1'])
         hist = HistogramGenerator._fig_to_base64(fig)
         plt.close(fig)

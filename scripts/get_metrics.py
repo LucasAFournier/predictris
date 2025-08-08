@@ -8,7 +8,7 @@ from pathlib import Path
 from predictris.agent import Agent
 from predictris.tetris import TetrisEnvironment
 from predictris.utils import dir_from_params
-from predictris.plot import PlotMetrics, format_title
+from predictris.plot import PlotMetrics
 
 
 ALLOWED_METRICS = ['nodes_count', 'confidences', 'time_per_step']
@@ -91,10 +91,7 @@ def main():
         for metric in chosen_metrics
     }
 
-    dir_name = dir_from_params(
-        tetrominos = ''.join(sorted(args.tetrominos)) if args.tetrominos else None,
-        depth = args.depth,
-    )
+    dir_name = dir_from_params(args)
 
     env = TetrisEnvironment()
     agent = env.build_agent(depth=args.depth, verbose=args.verbose, metrics=chosen_metrics)

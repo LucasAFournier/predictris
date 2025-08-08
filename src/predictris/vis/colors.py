@@ -9,7 +9,5 @@ DECORATION_COLORS = {
     "grid": (255, 255, 255),
 }
 
-def rgbint_to_rgb(color):
-    return tuple([x / 255 for x in color])
 
-CMAP = ListedColormap([rgbint_to_rgb(color) for color in COLORS.values()])
+CMAP = ListedColormap([tuple([rgb / 255 for rgb in color]) for color in COLORS.values()])

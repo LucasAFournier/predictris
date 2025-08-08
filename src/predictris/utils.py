@@ -1,3 +1,5 @@
-def dir_from_params(**attrs):
-    """Create a directory name from a set of parameters."""
-    return "_".join(f"{key}={value}" for key, value in attrs.items() if value is not None)
+def dir_from_params(args):
+    """Create a directory name from arguments."""
+    sorted_tetrominos = ''.join(sorted(args.tetrominos))
+
+    return f"tetrominos={sorted_tetrominos}_depth={args.depth}"

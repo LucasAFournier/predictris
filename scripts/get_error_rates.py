@@ -105,10 +105,7 @@ def main():
     interval = args.total_steps // args.points
     error_rates_reps = []
 
-    dir_name = dir_from_params(
-        tetrominos = ''.join(sorted(args.tetrominos)) if args.tetrominos else None,
-        depth = args.depth,
-    )
+    dir_name = dir_from_params(args)
 
     for rep in range(args.reps):
         env = TetrisEnvironment()

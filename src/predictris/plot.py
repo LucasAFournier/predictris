@@ -93,8 +93,6 @@ class PlotMetrics:
     def _plot_distribution_over_steps(self, ax: plt.Axes, metric: str, ylabel: str = '', ylim: tuple = None, **kwargs):
         """Plots the distribution of a metric over steps for each experiment."""
         ref_data = next((run_data.get(metric) for run_data in self.data_series if run_data.get(metric)), None)
-        if not ref_data:
-            return
         
         total_steps = np.array([item[0] for item in ref_data])
         step_delta = np.diff(total_steps).mean() if len(total_steps) > 1 else 1.0
