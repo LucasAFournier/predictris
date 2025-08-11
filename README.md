@@ -64,8 +64,8 @@ We outline the pseudocode for the agent's learning process, focusing on how it b
 
 *   `PredictionForest (F)`: A collection of `PredictionTree`s, indexed by the observation they predict.
 *   `ActiveSequences (S)`: A mapping from each `PredictionTree` in `F` to a set of `ActiveSequence` objects currently being tracked within that tree.
-*   `ActiveSequence`: A tuple `(currentNode, entryNode, context)` representing a path through a `PredictionTree`.
-*   `Context`: A tuple `(previousObservation, action)` that led to the activation of a sequence at its `entryNode`.
+*   `ActiveSequence`: A tuple `(currentNode, sourceNode, context)` representing a path through a `PredictionTree`.
+*   `Context`: A tuple `(previousObservation, action)` that led to the activation of a sequence at its `sourceNode`.
 
 ---
 
@@ -113,7 +113,7 @@ We outline the pseudocode for the agent's learning process, focusing on how it b
 > 7.  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*// Avoid paths with a different action from the one chosen*
 > 8.  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**If** `n_next` is the prediction node of `T`:
 > 9.  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`isCorrect` ← (`o_curr` matches the observation predicted by `T`).
-> 10.  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**UpdatePrediction**(`T`, `s.entryNode`, `s.context`, `isCorrect`).
+> 10.  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**UpdatePrediction**(`T`, `s.sourceNode`, `s.context`, `isCorrect`).
 > 11. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**Else if** `n_next` is in `M`:
 > 12. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*// Propagate the paths that coincide with the current situation*
 > 13. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`s.currentNode` ← `n_next`.
@@ -130,20 +130,20 @@ We outline the pseudocode for the agent's learning process, focusing on how it b
 
 #### **Algorithm 3: UpdatePrediction**
 
-**Requires:** A `PredictionTree T`, an `entryNode`, a `context`, and a boolean `isCorrect`.
+**Requires:** A `PredictionTree T`, an `sourceNode`, a `context`, and a boolean `isCorrect`.
 
 > 1.  **If** `isCorrect` is `False`:
 > 2.  &nbsp;&nbsp;&nbsp;&nbsp;*// The prediction was wrong, so this path is no longer considered reliable.*
-> 3.  &nbsp;&nbsp;&nbsp;&nbsp;Set `entryNode.confident` to `False`.
-> 4.  **Else if** `entryNode.confident` is `False`:
+> 3.  &nbsp;&nbsp;&nbsp;&nbsp;Set `sourceNode.confident` to `False`.
+> 4.  **Else if** `sourceNode.confident` is `False`:
 > 5.  &nbsp;&nbsp;&nbsp;&nbsp;*// The prediction was right although this path was not considered reliable.*
 > 6.  &nbsp;&nbsp;&nbsp;&nbsp;`o_context`, `a_context` ← `context`.
 > 7.  &nbsp;&nbsp;&nbsp;&nbsp;*// Reinforce the tree by adding the context that led to the correct prediction.*
-> 8.  &nbsp;&nbsp;&nbsp;&nbsp;**If** a path `(o_context) --a_context--> (entryNode)` does not already exist in `T`:
+> 8.  &nbsp;&nbsp;&nbsp;&nbsp;**If** a path `(o_context) --a_context--> (sourceNode)` does not already exist in `T`:
 > 9.  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`n_new` ← Create a new node in `T` representing `o_context`.
-> 10. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Add a directed edge from `n_new` to `entryNode`, labeled with action `a_context`.
+> 10. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Add a directed edge from `n_new` to `sourceNode`, labeled with action `a_context`.
 > 11. &nbsp;&nbsp;&nbsp;&nbsp;*// The path has been reinforced and is now considered confident.*
-> 12. &nbsp;&nbsp;&nbsp;&nbsp;Set `entryNode.confident` to `True`.
+> 12. &nbsp;&nbsp;&nbsp;&nbsp;Set `sourceNode.confident` to `True`.
 
 ## Experiments
 

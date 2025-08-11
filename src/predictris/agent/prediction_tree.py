@@ -58,14 +58,14 @@ class PredictionTree(nx.DiGraph):
             actions.append(action)
         return actions
 
-    def reinforce_correct_prediction(self, entry_node: UUID, context: Context):
+    def reinforce_correct_prediction(self, source_node: UUID, context: Context):
         """Create new context path for correct predictions."""
         try:
             observation, action = context.observation, context.action
 
             # Check if the node already exists
             for existing_node, _, existing_action in self.in_edges(
-                entry_node, data="action"
+                source_node, data="action"
             ):
                 if (
                     action == existing_action
@@ -75,10 +75,10 @@ class PredictionTree(nx.DiGraph):
 
             # If not, create a new node
             new_node = self._reinforce(
-                observation, self.nodes[entry_node]["level"] + 1
+                observation, self.nodes[source_node]["level"] + 1
             )
 
-            self.add_edge(new_node, entry_node, action=action)
+            self.add_edge(new_node, source_node, action=action)
 
         except:
             pass

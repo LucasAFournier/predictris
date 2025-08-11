@@ -17,16 +17,16 @@ from .metrics import MetricsRegistry
 @dataclass
 class ActiveSequence:
     current_node: UUID
-    entry_node: UUID
+    source_node: UUID
     context: Context
 
     def __hash__(self):
-        return hash(self.entry_node)
+        return hash(self.source_node)
 
     def __eq__(self, other):
         if not isinstance(other, ActiveSequence):
             return False
-        return self.entry_node == other.entry_node
+        return self.source_node == other.source_node
 
 
 class Agent:
@@ -156,14 +156,14 @@ class Agent:
                 if learn:
                     self._update_prediction(
                         tree,
-                        sequence.entry_node,
+                        sequence.source_node,
                         sequence.context,
                         correct_pred=correct,
                     )
-                if test and tree.nodes[sequence.entry_node].get(
+                if test and tree.nodes[sequence.source_node].get(
                     "confident", False
                 ):
-                    confidence = tree.nodes[sequence.entry_node][
+                    confidence = tree.nodes[sequence.source_node][
                         "confidence"
                     ]
                     self._metrics.emit(
@@ -193,20 +193,20 @@ class Agent:
     def _update_prediction(
         self,
         tree: PredictionTree,
-        entry_node: UUID,
+        source_node: UUID,
         context: Context,
         correct_pred: bool,
     ):
         """Update prediction tree based on context and correctness of prediction."""
-        entry_node = tree.nodes[entry_node]
+        source_node = tree.nodes[source_node]
         if not correct_pred:
-            entry_node["confident"] = False
-        elif not entry_node["confident"]:
-            if entry_node["level"] < tree.depth:
-                tree.reinforce_correct_prediction(entry_node, context)
-            entry_node["confident"] = True
+            source_node["confident"] = False
+        elif not source_node["confident"]:
+            if source_node["level"] < tree.depth:
+                tree.reinforce_correct_prediction(source_node, context)
+            source_node["confident"] = True
 
-        update_node_metrics(entry_node, correct_pred)
+        update_node_metrics(source_node, correct_pred)
 
     def _get_next_action(self) -> int:
         if not self.next_actions:
