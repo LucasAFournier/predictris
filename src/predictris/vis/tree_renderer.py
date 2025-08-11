@@ -8,7 +8,7 @@ from pyvis.network import Network
 from concurrent.futures import ThreadPoolExecutor
 from collections import Counter
 
-from predictris.learning import PredictionTree
+from predictris.agent import PredictionTree
 
 from .image_handler import ImageHandler
 

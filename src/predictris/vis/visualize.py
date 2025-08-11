@@ -10,7 +10,7 @@ from .tree_renderer import PredictionTreeRenderer
 from .selector import generate_selector
 from .colors import CMAP
 
-from predictris.learning import PredictionTree
+from predictris.agent import PredictionTree
 
 
 def visualize_trees(
