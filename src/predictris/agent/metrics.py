@@ -44,18 +44,6 @@ class MetricsRegistry:
 
 
 @dataclass
-class PredMetric:
-    """Counts total predictions and how many were correct."""
-    preds: int = 0
-    correct_preds: int = 0
-
-    # event handler -----------------------------------------------------
-    def on_prediction(self, *, correct: bool, confidence: float) -> None:
-        self.preds += 1
-        self.correct_preds += int(correct)
-
-
-@dataclass
 class ErrorRates:
     """Records prediction success rate for the highest confidence prediction at each step."""
     step: int = 0
@@ -157,9 +145,8 @@ class Confidences:
 
 
 METRIC_MAP = {
-    "pred": PredMetric,
-    "error_rate": ErrorRates,
-    "time_per_step": TimePerStep,
     "nodes_count": NodesCount,
     "confidences": Confidences,
+    "time_per_step": TimePerStep,
+    "error_rate": ErrorRates,
 }

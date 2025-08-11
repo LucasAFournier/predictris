@@ -1,22 +1,8 @@
-import numpy as np
 from pathlib import Path
 import random
 import csv
 
 from predictris.agent import Agent
-
-
-TETROMINO_NAMES = ["T", "J", "I", "O", "L", "Z", "S"]
-TETRIS_ACTIONS = {
-    0: "move_tetromino_up",
-    1: "move_tetromino_left",
-    2: "move_tetromino_right",
-    3: "move_tetromino_down",
-    4: "rotate_tetromino_cw",
-}
-TETRIS_PERCEPTIONS = {
-    0: "vision",
-}
 
 
 # Load valid states and create lookup
@@ -73,10 +59,13 @@ class TetrisEnvironment:
         else:
             self.state = state
         
-    def random_init(self, tetrominos: list[str] = TETROMINO_NAMES):
+    def random_init(self, tetrominos: list[str]):
         """Create a random environment with a valid tetromino configuration."""
         name = random.choice(tetrominos)
-        self.state = random.choice(VALID_STATES[name])
+        try:
+            self.state = random.choice(VALID_STATES[name])
+        except KeyError:
+            raise ValueError(f'Invalid tetromino name: {name}. Available names: I, J, L, O, S, T, Z')
         
     def vision(self, agent: Agent) -> tuple:
         """Get precomputed observation for current state."""

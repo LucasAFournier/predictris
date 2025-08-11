@@ -5,7 +5,7 @@ from tqdm import tqdm
 import os
 from pathlib import Path
 
-from predictris.agent import Agent, ErrorRates
+from predictris.agent import Agent
 from predictris.tetris import TetrisEnvironment
 from predictris.utils import dir_from_params
 

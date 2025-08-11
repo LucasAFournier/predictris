@@ -7,12 +7,18 @@ from pyvis.network import Network
 from concurrent.futures import ThreadPoolExecutor
 from collections import Counter
 
-from predictris.tetris import TETRIS_ACTIONS
 from predictris.learning import PredictionTree
 
 from .image_handler import ImageHandler
 
 
+TETRIS_ACTIONS = {
+    0: "move_tetromino_up",
+    1: "move_tetromino_left",
+    2: "move_tetromino_right",
+    3: "move_tetromino_down",
+    4: "rotate_tetromino_cw",
+}
 TREE_CONFIG = """
 {
     "physics": {

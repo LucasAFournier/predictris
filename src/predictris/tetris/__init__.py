@@ -1,1 +1,1 @@
-from .env import TetrisEnvironment, TETRIS_ACTIONS
+from .env import TetrisEnvironment

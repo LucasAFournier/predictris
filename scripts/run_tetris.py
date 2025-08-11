@@ -2,7 +2,7 @@ import argparse
 
 import pygame
 from predictris.tetris import TetrisEnvironment
-from predictris.vis.game_renderer import TetrisRenderer
+from predictris.vis import TetrisRenderer
 
 
 def parse_args():
