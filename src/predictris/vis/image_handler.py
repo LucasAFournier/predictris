@@ -15,7 +15,7 @@ class ImageHandler:
     def __init__(self) -> None:
         self.cache_lock = threading.Lock()
         self.image_cache = {}
-        plt.switch_backend('Agg')
+        plt.switch_backend("Agg")
 
     def get_node_image(self, observation: List[float]) -> str:
         matrix_key = tuple(observation)
@@ -23,7 +23,7 @@ class ImageHandler:
         if cached_image is None:
             matrix_array = np.array(observation).reshape(
                 (int(sqrt(len(observation))), int(sqrt(len(observation)))),
-                order='F'
+                order="F",
             )
             cached_image = self.generate_image(matrix_array, CMAP)
             self.set_cached_image(matrix_key, cached_image)
@@ -33,7 +33,9 @@ class ImageHandler:
         with self.cache_lock:
             return self.image_cache.get(matrix_key)
 
-    def set_cached_image(self, matrix_key: Tuple[float, ...], image: str) -> None:
+    def set_cached_image(
+        self, matrix_key: Tuple[float, ...], image: str
+    ) -> None:
         with self.cache_lock:
             self.image_cache[matrix_key] = image
 
@@ -42,10 +44,10 @@ class ImageHandler:
         fig = plt.figure(figsize=(2, 2), dpi=72)
         ax = fig.add_subplot(111)
         ax.imshow(matrix_array, vmin=0, vmax=1, cmap=colormap)
-        ax.axis('off')
+        ax.axis("off")
 
         buffer = BytesIO()
-        fig.savefig(buffer, format='png', bbox_inches='tight', pad_inches=0)
+        fig.savefig(buffer, format="png", bbox_inches="tight", pad_inches=0)
         plt.close(fig)
 
         buffer.seek(0)

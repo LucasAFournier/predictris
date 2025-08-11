@@ -1,8 +1,8 @@
 from matplotlib.colors import ListedColormap
 
 COLORS = {
-    0: (220, 220, 220), # Light gray
-    1: (0, 0, 0), # Black
+    0: (220, 220, 220),  # Light gray
+    1: (0, 0, 0),  # Black
 }
 
 DECORATION_COLORS = {
@@ -10,4 +10,6 @@ DECORATION_COLORS = {
 }
 
 
-CMAP = ListedColormap([tuple([rgb / 255 for rgb in color]) for color in COLORS.values()])
+CMAP = ListedColormap(
+    [tuple([rgb / 255 for rgb in color]) for color in COLORS.values()]
+)

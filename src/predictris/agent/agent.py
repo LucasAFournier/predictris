@@ -7,21 +7,34 @@ from pathlib import Path
 from typing import Callable
 from uuid import UUID
 import time
-
+from dataclasses import dataclass
 from tqdm import tqdm
 
-from predictris.learning.prediction_tree import (
-    Context,
-    ObservationAction as OA,
-    PredictionTree,
-)
+from predictris.learning import Context, PredictionTree
 
-# centralised metrics hub -------------------------------------------------
 from .metrics import MetricsRegistry
 
 
+@dataclass
+class ActiveSequence:
+    current_node: UUID
+    entry_node: UUID
+    context: Context
+
+    def __hash__(self):
+        return hash(self.entry_node)
+
+    def __eq__(self, other):
+        if not isinstance(other, ActiveSequence):
+            return False
+        return self.entry_node == other.entry_node
+
+
 class Agent:
-    """Learning agent that explores an environment and builds a forest of prediction trees."""
+    """
+    Learning agent that explores an environment and builds a forest of
+    prediction trees.
+    """
 
     def __init__(
         self,
@@ -36,11 +49,11 @@ class Agent:
         self.depth = depth
         self.verbose = verbose
 
-        self.trees_by_pred: dict[tuple, PredictionTree] = {}
+        self.prediction_forest: dict[tuple, PredictionTree] = {}
         self.next_actions: deque[int] = deque()
-        self.active_contexts_by_pred: dict[tuple, dict[UUID, Context]] = {}
+        self.active_sequences_by_pred: dict[tuple, set[ActiveSequence]] = {}
 
-        # ---------- metrics initialization --------------------------------
+        # metrics initialization
         self._metrics: MetricsRegistry = MetricsRegistry(self)
         if metrics:
             for metric in metrics:
@@ -56,56 +69,90 @@ class Agent:
         return tuple(
             (k, perceive(self)) for k, perceive in self.perception_dict.items()
         )
-    
+
     def perform(self, action: int):
         self.action_dict[action](self)
 
-    def init_learn_episode(self, action: str, activation: str):
+    def init_episode(
+        self,
+        action_choice: str,
+        activation: str,
+        learn: bool = False,
+        test: bool = False,
+    ):
         """Prime the agent and reset metrics."""
-        self.action_choice = action          # 'random' | 'from_active'
-        self.activation = activation                # 'all' | 'by_confidence'
+        self.action_choice = action_choice  # 'random' | 'from_active'
+        self.activation = activation  # 'all' | 'by_confidence'
 
-        # update -----------------------------------------------------------
+        # update
         obs = self.observe()
-        self.trees_by_pred.setdefault(obs, PredictionTree(obs, depth=self.depth))
+        self.prediction_forest.setdefault(
+            obs, PredictionTree(obs, depth=self.depth)
+        )
         self.prev_obs = obs
 
-    def learn(self):
+        if test:
+            self._metrics.emit("test_episode")
+
+    def update(self, learn: bool = False, test: bool = False):
         start = time.time()
-        
-        # ---------- act ---------------------------------------------------
+
+        # act 
         action = self._get_next_action()
         self.perform(action)
-        self.last_oa = OA(self.prev_obs, action)
+        self.current_context = Context(self.prev_obs, action)
 
-        # ---------- perceive ---------------------------------------------
+        # perceive 
         obs = self.observe()
 
-        tree = self.trees_by_pred.setdefault(obs, PredictionTree(obs, depth=self.depth))
-        tree.reinforce_correct_prediction(Context(self.last_oa, tree.pred_node))
+        if learn:
+            # reinforce prediction node
+            tree = self.prediction_forest.setdefault(
+                obs, PredictionTree(obs, depth=self.depth)
+            )
+            tree.reinforce_correct_prediction(
+                tree.pred_node, self.current_context
+            )
 
-        # ---------- context propagation ----------------------------------
-        new_active: dict[tuple, dict[UUID, Context]] = {}
+        # context propagation
+        new_active: dict[tuple, set[ActiveSequence]] = {}
 
-        for pred, tree in self.trees_by_pred.items():
+        for pred, tree in self.prediction_forest.items():
             matching = tree.get_nodes_from_obs(obs).copy()
-            updated: dict[UUID, Context] = {}
+            updated: set[ActiveSequence] = set()
 
-            for prev_node, ctx in self.active_contexts_by_pred.get(pred, {}).items():
+            for sequence in self.active_sequences_by_pred.get(pred, set()):
                 _, next_node, edge_action = next(
-                    iter(tree.out_edges(prev_node, data="action"))
+                    iter(tree.out_edges(sequence.current_node, data="action"))
                 )
                 if edge_action != action:
                     continue
 
                 # reached prediction node => evaluate
                 if next_node == tree.pred_node:
-                    correct = (obs == pred)
-                    tree.update_prediction(ctx, correct_pred=correct)                       
+                    correct = obs == pred
+                    if learn:
+                        tree.update_prediction(
+                            sequence.entry_node,
+                            sequence.context,
+                            correct_pred=correct,
+                        )
+                    if test and tree.nodes[sequence.entry_node].get(
+                        "confident", False
+                    ):
+                        confidence = tree.nodes[sequence.entry_node][
+                            "confidence"
+                        ]
+                        self._metrics.emit(
+                            "prediction",
+                            correct=correct,
+                            confidence=confidence,
+                        )
 
                 # ordinary transition
                 elif next_node in matching:
-                    updated[next_node] = ctx
+                    sequence.current_node = next_node
+                    updated.add(sequence)
                     matching.remove(next_node)
 
             # spawn new contexts
@@ -114,89 +161,20 @@ class Agent:
                     self.activation == "by_confidence"
                     and random.random() < tree.nodes[node]["confidence"]
                 ):
-                    updated[node] = Context(self.last_oa, node)
-
-            new_active[pred] = updated
-
-        self.active_contexts_by_pred = new_active
-        self.prev_obs = obs
-
-        # ---------- metrics step -----------------------------------------
-        self._metrics.emit("learn_step", time=time.time() - start)
-
-    def init_test_episode(self, action_choice: str, activation: str):
-        """Prime the agent and reset metrics."""
-        self.action_choice = action_choice
-        self.activation = activation
-
-        # update -----------------------------------------------------------
-        obs = self.observe()
-        self.trees_by_pred.setdefault(obs, PredictionTree(obs, depth=self.depth))
-        self.prev_obs = obs
-
-        self._metrics.emit("test_episode")
-
-    def test(self):
-        # ---------- act ---------------------------------------------------
-        action = self._get_next_action()
-        self.perform(action)
-        self.last_oa = OA(self.prev_obs, action)
-
-        # ---------- perceive ---------------------------------------------
-        obs = self.observe()
-
-        tree = self.trees_by_pred.setdefault(obs, PredictionTree(obs, depth=self.depth))
-        tree.reinforce_correct_prediction(Context(self.last_oa, tree.pred_node))
-
-        # ---------- context propagation ----------------------------------
-        new_active: dict[tuple, dict[UUID, Context]] = {}
-
-        for pred, tree in self.trees_by_pred.items():
-            matching = tree.get_nodes_from_obs(obs).copy()
-            updated: dict[UUID, Context] = {}
-
-            for prev_node, ctx in self.active_contexts_by_pred.get(pred, {}).items():
-                _, next_node, edge_action = next(
-                    iter(tree.out_edges(prev_node, data="action"))
-                )
-                if edge_action != action:
-                    continue
-
-                # reached prediction node => evaluate
-                if next_node == tree.pred_node:
-                    correct = (obs == pred)
-                    self._metrics.emit("path_close", pred=pred, node=prev_node)
-                    if tree.nodes[ctx.node].get("confident", False):
-                        confidence = tree.nodes[ctx.node]["confidence"]
-                        self._metrics.emit("prediction", correct=correct, confidence=confidence)                        
-
-                # ordinary transition
-                elif next_node in matching:
-                    updated[next_node] = ctx
-                    matching.remove(next_node)
-                    self._metrics.emit(
-                        "path_transfer",
-                        pred=pred,
-                        from_node=prev_node,
-                        to_node=next_node,
+                    updated.add(
+                        ActiveSequence(node, node, self.current_context)
                     )
 
-            # spawn new contexts
-            for node in matching:
-                if self.activation == "all" or (
-                    self.activation == "by_confidence"
-                    and random.random() < tree.nodes[node]["confidence"]
-                ):
-                    updated[node] = Context(self.last_oa, node)
-                    self._metrics.emit("path_open", pred=pred, node=node)
-
             new_active[pred] = updated
 
-        self.active_contexts_by_pred = new_active
+        self.active_sequences_by_pred = new_active
         self.prev_obs = obs
 
-        # ---------- metrics step -----------------------------------------
-        self._metrics.emit("test_step")
+        # metrics step
+        if learn:
+            self._metrics.emit("learn_step", time=time.time() - start)
+        if test:
+            self._metrics.emit("test_step")
 
     def _get_next_action(self) -> int:
         if not self.next_actions:
@@ -204,22 +182,21 @@ class Agent:
         return self.next_actions.popleft()
 
     def _choose_actions(self):
-        if (
-            self.action_choice == "from_active"
-            and (active := self._get_active_nodes())
+        if self.action_choice == "from_active" and (
+            current := self._get_current_nodes()
         ):
-            pred, node = random.choice(list(active))
+            pred, node = random.choice(list(current))
             self.next_actions.extend(
-                self.trees_by_pred[pred].get_actions_to_pred(node)
+                self.prediction_forest[pred].get_actions_to_pred(node)
             )
         else:
             self.next_actions.append(random.choice(list(self.action_dict)))
 
-    def _get_active_nodes(self) -> set[tuple[tuple, UUID]]:
+    def _get_current_nodes(self) -> set[tuple[tuple, UUID]]:
         return {
-            (pred, node)
-            for pred, ctxs in self.active_contexts_by_pred.items()
-            for node in ctxs
+            (pred, seq.current_node)
+            for pred, sequences in self.active_sequences_by_pred.items()
+            for seq in sequences
         }
 
     def load(self, dir: Path, verbose: bool = False):
@@ -229,12 +206,12 @@ class Agent:
         paths = glob.glob(str(dir / "*.gpickle"))
         for fp in tqdm(paths, desc="Loading trees", leave=False):
             tree = PredictionTree.load(Path(fp))
-            self.trees_by_pred[tree.pred_obs] = tree
+            self.prediction_forest[tree.pred_obs] = tree
         if verbose:
             print(f"Loaded {len(paths)} trees from {dir}")
 
     def save(self, dir: Path, verbose: bool = False):
         if verbose:
             print(f"\nSaving trees to {dir}")
-        for tree in self.trees_by_pred.values():
+        for tree in self.prediction_forest.values():
             tree.save(dir)

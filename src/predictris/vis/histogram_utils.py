@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from io import BytesIO
 import base64
 
+
 class HistogramGenerator:
     @staticmethod
     def generate_level_histogram(level_counts: dict, steps: int) -> str:
@@ -19,7 +20,7 @@ class HistogramGenerator:
         """Generate a histogram for confidence score distribution."""
         fig = plt.figure(figsize=(4, 2))
         plt.hist(confidences, bins=50, range=(0, 1))
-        plt.xticks([0, 0.5, 1], ['0', '0.5', '1'])
+        plt.xticks([0, 0.5, 1], ["0", "0.5", "1"])
         hist = HistogramGenerator._fig_to_base64(fig)
         plt.close(fig)
         return hist
@@ -28,7 +29,7 @@ class HistogramGenerator:
     def _fig_to_base64(fig: plt.Figure) -> str:
         """Convert matplotlib figure to base64 string."""
         buf = BytesIO()
-        fig.savefig(buf, format='png', bbox_inches='tight', dpi=100)
+        fig.savefig(buf, format="png", bbox_inches="tight", dpi=100)
         buf.seek(0)
         data = buf.getvalue()
         buf.close()

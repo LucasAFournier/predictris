@@ -7,47 +7,54 @@ from predictris.agent import Agent
 
 # Load valid states and create lookup
 VALID_STATES = {}
-with open(Path(__file__).parent / 'valid_states.csv') as f:
+with open(Path(__file__).parent / "valid_states.csv") as f:
     reader = csv.DictReader(f)
     for row in reader:
-        name = row['name']
+        name = row["name"]
         if name not in VALID_STATES:
             VALID_STATES[name] = []
-        VALID_STATES[name].append((
-            name,
-            int(row['pos_x']),
-            int(row['pos_y']),
-            int(row['orientation']),
-        ))
+        VALID_STATES[name].append(
+            (
+                name,
+                int(row["pos_x"]),
+                int(row["pos_y"]),
+                int(row["orientation"]),
+            )
+        )
 
 # Load observations and create lookup
 STATE_TO_OBS = {}
-with open(Path(__file__).parent / 'state_to_obs.csv') as f:
+with open(Path(__file__).parent / "state_to_obs.csv") as f:
     reader = csv.DictReader(f)
     for row in reader:
-        state_key = (row['name'], 
-                    int(row['pos_x']), 
-                    int(row['pos_y']), 
-                    int(row['orientation']))
-        STATE_TO_OBS[state_key] = tuple(int(row[f'obs_{i}']) for i in range(9))
+        state_key = (
+            row["name"],
+            int(row["pos_x"]),
+            int(row["pos_y"]),
+            int(row["orientation"]),
+        )
+        STATE_TO_OBS[state_key] = tuple(int(row[f"obs_{i}"]) for i in range(9))
 
 # Load valid actions and create lookup
 VALID_ACTIONS = {}
-with open(Path(__file__).parent / 'valid_actions.csv') as f:
+with open(Path(__file__).parent / "valid_actions.csv") as f:
     reader = csv.DictReader(f)
     for row in reader:
-        from_key = (row['from_name'], 
-                   int(row['from_x']), 
-                   int(row['from_y']), 
-                   int(row['from_orientation']))
+        from_key = (
+            row["from_name"],
+            int(row["from_x"]),
+            int(row["from_y"]),
+            int(row["from_orientation"]),
+        )
         if from_key not in VALID_ACTIONS:
             VALID_ACTIONS[from_key] = {}
-        VALID_ACTIONS[from_key][int(row['action'])] = (
-            row['to_name'],
-            int(row['to_x']),
-            int(row['to_y']),
-            int(row['to_orientation'])
+        VALID_ACTIONS[from_key][int(row["action"])] = (
+            row["to_name"],
+            int(row["to_x"]),
+            int(row["to_y"]),
+            int(row["to_orientation"]),
         )
+
 
 class TetrisEnvironment:
     """Represents the Tetris game environment."""
@@ -55,18 +62,20 @@ class TetrisEnvironment:
     def __init__(self, state: dict = None):
         """Initialize the Tetris environment with a given Tetromino state."""
         if state is None:
-            self.random_init()
+            self.random_init(["I", "J", "L", "O", "S", "T", "Z"])
         else:
             self.state = state
-        
+
     def random_init(self, tetrominos: list[str]):
         """Create a random environment with a valid tetromino configuration."""
         name = random.choice(tetrominos)
         try:
             self.state = random.choice(VALID_STATES[name])
         except KeyError:
-            raise ValueError(f'Invalid tetromino name: {name}. Available names: I, J, L, O, S, T, Z')
-        
+            raise ValueError(
+                f"Invalid tetromino name: {name}. Available names: I, J, L, O, S, T, Z"
+            )
+
     def vision(self, agent: Agent) -> tuple:
         """Get precomputed observation for current state."""
         return STATE_TO_OBS[self.state]
@@ -76,9 +85,15 @@ class TetrisEnvironment:
         try:
             self.state = VALID_ACTIONS[self.state][action_id]
         except KeyError:
-            pass # Invalid action, do nothing
+            pass  # Invalid action, do nothing
 
-    def build_agent(self, depth: int, dir: Path = None, metrics: list[str] | None = None, verbose: bool = False) -> Agent:
+    def build_agent(
+        self,
+        depth: int,
+        dir: Path = None,
+        metrics: list[str] | None = None,
+        verbose: bool = False,
+    ) -> Agent:
         """Build an agent for the Tetris environment."""
         agent = Agent(
             {
@@ -96,6 +111,6 @@ class TetrisEnvironment:
         )
 
         if dir:
-            agent.load(dir, verbose=verbose)            
-            
+            agent.load(dir, verbose=verbose)
+
         return agent

@@ -1,4 +1,5 @@
 import os
+
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 import pygame
 
@@ -10,28 +11,28 @@ from .colors import DECORATION_COLORS, COLORS
 BLOCK_SIZE = 30
 FPS = 60
 GRID_SIZE: tuple[int, int] = (3, 3)
-    
+
 
 class TetrisRenderer:
     """A Pygame-based renderer for the Tetris agent visualization."""
-    
+
     def __init__(self, env: TetrisEnvironment, agent: Agent) -> None:
         self.env = env
         self.agent = agent
-        
+
         pygame.init()
         self.screen = pygame.display.set_mode(
             (GRID_SIZE[0] * BLOCK_SIZE, GRID_SIZE[1] * BLOCK_SIZE)
         )
         pygame.display.set_caption("Tetris")
         self.clock = pygame.time.Clock()
-        
+
         self.key_action_map: dict[int, callable] = {
             pygame.K_LEFT: lambda: self.env.act(0),  # Up
-            pygame.K_UP: lambda: self.env.act(1),    # Left
+            pygame.K_UP: lambda: self.env.act(1),  # Left
             pygame.K_DOWN: lambda: self.env.act(2),  # Right
-            pygame.K_RIGHT: lambda: self.env.act(3), # Down
-            pygame.K_SPACE: lambda: self.env.act(4), # Rotate
+            pygame.K_RIGHT: lambda: self.env.act(3),  # Down
+            pygame.K_SPACE: lambda: self.env.act(4),  # Rotate
         }
 
         self.render()

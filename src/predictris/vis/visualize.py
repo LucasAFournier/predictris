@@ -13,34 +13,38 @@ from .colors import CMAP
 from predictris.learning import PredictionTree
 
 
-def visualize_trees(input_dir: str, output_dir: str, verbose: bool = False) -> None:
+def visualize_trees(
+    input_dir: str, output_dir: str, verbose: bool = False
+) -> None:
     """Visualize all prediction trees from an input directory and generate a selector page."""
-    input_path = Path(f'results/{input_dir}')
+    input_path = Path(f"results/{input_dir}")
     if not input_path.exists():
         raise FileNotFoundError(f"Input directory not found: {input_path}")
 
-    os.makedirs(f'visualizations/{output_dir}', exist_ok=True)
-    
+    os.makedirs(f"visualizations/{output_dir}", exist_ok=True)
+
     tree_data = {}
     for filepath in glob.glob(str(input_path / "*.gpickle")):
         input_filename = Path(filepath).stem
-            
+
         tree = PredictionTree.load(Path(filepath))
         renderer = PredictionTreeRenderer(tree)
-        renderer.save_graph(f'visualizations/{output_dir}/{input_filename}.html')
-        
+        renderer.save_graph(
+            f"visualizations/{output_dir}/{input_filename}.html"
+        )
+
         metrics = renderer._calculate_tree_metrics(tree)
         pred_img = to_base64(tree.pred_obs)
         tree_data[input_filename] = {
-            'metrics': metrics,
-            'pred_image': pred_img,
-            'name': tree.name,
-            'max_depth': metrics['max_depth']
+            "metrics": metrics,
+            "pred_image": pred_img,
+            "name": tree.name,
+            "max_depth": metrics["max_depth"],
         }
-        
-    steps = max(data['max_depth'] for data in tree_data.values())
-    
-    generate_selector(tree_data, steps, f'visualizations/{output_dir}')
+
+    steps = max(data["max_depth"] for data in tree_data.values())
+
+    generate_selector(tree_data, steps, f"visualizations/{output_dir}")
 
 
 def to_base64(vec: np.ndarray) -> str:
