@@ -66,7 +66,7 @@ While conceptually sound, we saw two flaws in these prediction paths:
 1. Asymptotically, an agent creates as many paths as there are “unique” situations.
 2. In the adequate setting, a short path and a longer path that extends it will both activate the same prediction. We only want to consider the prediction by the long path as it has more context.
 
-We adress these problems by introducing `PredictionTree`s. A prediction tree (Fig. 2) is a labelled, directed tree that stores all prediction paths with the same observation as prediction by merging them from the prediction node upwards.
+We address these problems by introducing `PredictionTree`s. A prediction tree (Fig. 2) is a labelled, directed tree that stores all prediction paths with the same observation as prediction by merging them from the prediction node upwards.
 
 > **Remark:** Every edge of such a tree being directed towards the common prediction node, the graph can also be called an "in-tree" and this node can be considered the root of the tree.
 
@@ -83,10 +83,6 @@ only the **minimal** action–observation history needed for reliable forecastin
 At step $t$ the agent activates every node whose observation matches its current perception $o_t$ (dotted circles) and follows the outgoing edge corresponding to the executed action $a_t$. Reaching the root tests the prediction: a failure flips the source node to *uncertain* (black circle), whereas a subsequent success uses backward induction to append a previous observation–action pair to the start node, after which the node becomes *confident* (plain circle).
 
 Extensions therefore arise only on previously uncertain nodes, so the tree "converges" to the shortest prefixes sufficient for prediction, yielding a compact, incrementally constructed memory whose depth adapts to the empirical complexity of the environment.
-
-## Code Structure
-
-The project's code is structured modularly to separate the core learning mechanisms from the environment. The agent learning and prediction logic using prediction trees resides in [`src/predictris/agent/`](src/predictris/agent/), whereas the tetris environment implementation resides in [`src/predictris/tetris/`](src/predictris/tetris/). This design ensures that the agent is agnostic to the specific world it inhabits, receiving only perception and action functions during initialization.
 
 ## Algorithm
 
@@ -178,6 +174,10 @@ We outline the pseudocode for the agent's learning process, focusing on how it b
 > 10. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Add a directed edge from `n_new` to `sourceNode`, labeled with action `a_context`.
 > 11. &nbsp;&nbsp;&nbsp;&nbsp;*// The path has been reinforced and is now considered confident.*
 > 12. &nbsp;&nbsp;&nbsp;&nbsp;Set `sourceNode.confident` to `True`.
+
+## Code Structure
+
+The project's code is structured modularly to separate the core learning mechanisms from the environment. The agent learning and prediction logic using prediction trees resides in [`src/predictris/agent/`](src/predictris/agent/), whereas the tetris environment implementation resides in [`src/predictris/tetris/`](src/predictris/tetris/). This design ensures that the agent is agnostic to the specific world it inhabits, receiving only perception and action functions during initialization.
 
 ## Experiments
 
