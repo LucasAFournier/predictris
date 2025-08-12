@@ -49,20 +49,13 @@ class ErrorRates:
     step: int = 0
     episodes: int = 0
     error_rates = dict[int, int]()
-    current_conf: float = 0.0
-    current_pred: bool = False
 
-    def on_prediction(self, *, correct: bool, confidence: float) -> None:        
-        if confidence > self.current_conf:
-            self.current_conf = confidence
-            self.current_pred = correct
+    def on_prediction(self, *, correct: bool) -> None:
+        self.error_rates[self.step] = self.error_rates.get(self.step, 0) + int(
+            correct
+        )
 
     def on_test_step(self) -> None:
-        self.error_rates[self.step] = self.error_rates.get(self.step, 0) + int(
-            self.current_pred
-        )
-        self.current_conf = 0.0
-        self.current_pred = False
         self.step += 1
 
     def on_test_episode(self) -> None:
@@ -73,8 +66,6 @@ class ErrorRates:
         self.step = 0
         self.episodes = 0
         self.error_rates.clear()
-        self.current_conf = 0.0
-        self.current_pred = False
 
     def result(self) -> float:
         result = {

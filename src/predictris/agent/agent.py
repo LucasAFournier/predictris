@@ -161,13 +161,9 @@ class Agent:
                         correct_pred=correct,
                     )
                 if test and tree.nodes[sequence.source_node]["confident"]:
-                    confidence = tree.nodes[sequence.source_node][
-                        "confidence"
-                    ]
                     self._metrics.emit(
                         "prediction",
-                        correct=correct,
-                        confidence=confidence,
+                        correct=correct
                     )
 
             # ordinary transition

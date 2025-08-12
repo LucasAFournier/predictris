@@ -45,18 +45,18 @@ We explore this by proposing a minimalist yet powerful memory mechanism that inc
 
 Drawing on insights from adaptive decision‑tree streams [2, 3], we propose a model using several new objects defined as follows.
 
-The fundamental object we use in our model is called a **prediction path**.
+The fundamental object we use in our model is called a `PredictionPath`.
 
-Following **P1**, a prediction path predicts the perceived result of a chosen action in a given situation. For a vision-only agent, this perception is simply its next observation $o$ and we consider this case from now onwards. The prediction is encoded in a **prediction node** (Fig. 1) that is connected to the agent's representation of the situation and that asserts “given this situation, the next observation will be $o$.”
+Following **P1**, a prediction path predicts the perceived result of a chosen action in a given situation. For a vision-only agent, this perception is simply its next observation $o$ and we consider this case from now onwards. The prediction is encoded in a `prediction_node` (Fig. 1) that is connected to the agent's representation of the situation and that asserts “given this situation, the next observation will be $o$.”
 
-Following **P2**, the agent's representation of a situation takes the form of an observation–action sequence that alternates observations (represented as nodes) and actions (represented as labelled, directed edges) and that ultimately lead to the prediction node. We refer to the first observation node of a sequence—at which the agent recognizes the prediction path “begins”—as the **source node** (Fig. 1).
+Following **P2**, the agent's representation of a situation takes the form of an observation–action sequence that alternates observations (represented as nodes) and actions (represented as labelled, directed edges) and that ultimately lead to the prediction node. We refer to the first observation node of a sequence—at which the agent recognizes the prediction path “begins”—as the `source_node` (Fig. 1).
 
-As observations and actions happen, paths get traversed during so-called **sequences**. A sequence starts when the source node corresponds to the current observation, which is then marked as **active**. This label is then transmitted as the sequence gets longer down the path until either the sequence doesn't match the observations and actions anymore, or the prediction node becomes active at the end of the path.
+As observations and actions happen, paths get traversed during so-called `Sequence`s. A sequence starts when the source node corresponds to the current observation, which is then marked as `active`. This label is then transmitted as the sequence gets longer down the path until either the sequence doesn't match the observations and actions anymore, or the prediction node becomes active at the end of the path.
 
 Finally, following **P3**, the prediction paths are created incrementally through interaction. Intuitively, when the situation is simple the paths should be short; when the situation is ambiguous the paths should be longer and carry more recent interaction to result in a confident prediction.  
-To implement that behavior, each path has a **confidence** boolean state and each sequence carries a **context**—the (observation, action) pair that occurred just before the start of the sequence at the source node (Fig. 1). These attributes determine how the agent learns from a prediction when a prediction node becomes active at the end of a path:
-* if the path is in an *unconfident* state but the prediction is correct, a new path is created using the context of the sequence by copying the existing path and prepending a new node (observation) to its source node via a new edge (action); the original path then becomes *confident*.
-* if the prediction is wrong, the path becomes *unconfident* until further evidence justifies extension.
+To implement that behavior, each path has a `confidence` boolean state and each sequence carries a `context`—the (observation, action) pair that occurred just before the start of the sequence at the source node (Fig. 1). These attributes determine how the agent learns from a prediction when a prediction node becomes active at the end of a path:
+* if the path is in an *uncertain* state but the prediction is correct, a new path is created using the context of the sequence by copying the existing path and prepending a new node (observation) to its source node via a new edge (action); the original path then becomes *confident*.
+* if the prediction is wrong, the path becomes *uncertain* until further evidence justifies extension.
 This online update rule ensures longer paths are only created when experience proves additional context is required.
 
 ![Example of a prediction path with a sequence (grey dots) activated by a specific observation-action history.](docs/img/prediction_path.svg)
@@ -64,17 +64,25 @@ This online update rule ensures longer paths are only created when experience pr
 
 While conceptually sound, we saw two flaws in these prediction paths:
 1. Asymptotically, an agent creates as many paths as there are “unique” situations.
-2. In the adequate setting, a short path and a longer path that extends it will both activate a sequence and a prediction. We only want to  
+2. In the adequate setting, a short path and a longer path that extends it will both activate the same prediction. We only want to consider the prediction by the long path as it has more context.
+
+We adress these problems by introducing `PredictionTree`s. A prediction tree (Fig. 2) is a labelled, directed tree that stores all prediction paths with the same observation as prediction by merging them from the prediction node upwards.
+
+> **Remark:** Every edge of such a tree being directed towards the common prediction node, the graph can also be called an "in-tree" and this node can be considered the root of the tree.
+
+These trees have the following properties:
+* **P1**: Each path from any node to the prediction node (or root) of a prediction tree is a prediction path as defined before.
+* **P2**: Each prediction path can be uniquely identified by its source node in a prediction tree. We thus associate the confidence state and 
 
 
-A prediction tree (Fig. 2) is a rooted, labelled digraph that stores only the **minimal** action–observation history needed for reliable forecasting. The root represents the observation the agent seeks to predict; all other nodes hold an earlier observation and a Boolean flag indicating whether the model is confident in the future prediction if it follows the action path from this source node.
+only the **minimal** action–observation history needed for reliable forecasting. The root represents the observation the agent seeks to predict; all other nodes hold an earlier observation and a Boolean flag indicating whether the model is confident in the future prediction if it follows the action path from this source node.
 
 ![Example of the construction of prediction trees for a specific observation–action history with timesteps.](docs/img/prediction_trees.svg)
 **Figure 2:** Example of the construction of prediction trees for a specific observation–action history with timesteps.
 
-At step $t$ the agent activates every node whose observation matches its current perception $o_t$ (dotted circles) and follows the outgoing edge corresponding to the executed action $a_t$. Reaching the root tests the prediction: a failure flips the source node to *unconfident* (black circle), whereas a subsequent success uses backward induction to append a previous observation–action pair to the start node, after which the node becomes *confident* (plain circle).
+At step $t$ the agent activates every node whose observation matches its current perception $o_t$ (dotted circles) and follows the outgoing edge corresponding to the executed action $a_t$. Reaching the root tests the prediction: a failure flips the source node to *uncertain* (black circle), whereas a subsequent success uses backward induction to append a previous observation–action pair to the start node, after which the node becomes *confident* (plain circle).
 
-Extensions therefore arise only on previously unconfident nodes, so the tree "converges" to the shortest prefixes sufficient for prediction, yielding a compact, incrementally constructed memory whose depth adapts to the empirical complexity of the environment.
+Extensions therefore arise only on previously uncertain nodes, so the tree "converges" to the shortest prefixes sufficient for prediction, yielding a compact, incrementally constructed memory whose depth adapts to the empirical complexity of the environment.
 
 ## Code Structure
 
