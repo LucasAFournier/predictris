@@ -1,4 +1,4 @@
-# Online Sensorimotor Sequence‑based Learning Using Predictive Trees
+# Online Sensorimotor Sequence‑based Learning Using Prediction Trees
 
 <!-- Badges (optional): e.g., build status, license, arXiv — leave blank intentionally -->
 
@@ -6,11 +6,17 @@
 - [Overview](#overview)
 - [Method](#method)
   - [Principles](#principles)
-  - [Predictive Trees](#predictive-trees)
+  - [Prediction Trees](#prediction-trees)
+- [Code Structure](#code-structure)
+- [Algorithm](#algorithm)
+  - [Agent Learning and Prediction](#agent-learning-and-prediction)
 - [Experiments](#experiments)
-- [Figure](#figure)
-- [Project Links](#project-links)
 - [Usage](#usage)
+  - [Interactive Simulation](#interactive-simulation)
+  - [Training the Agent](#training-the-agent)
+  - [Collecting Metrics & Error Rates](#collecting-metrics--error-rates)
+  - [Plotting Results](#plotting-results)
+  - [Visualizing Prediction Trees](#visualizing-prediction-trees)
 - [Installation](#installation)
 - [Requirements](#requirements)
 - [Demo](#demo)
@@ -19,7 +25,6 @@
 - [Authors](#authors)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
-- [Contact](#contact)
 
 ## Overview
 
@@ -32,19 +37,40 @@ We explore this by proposing a minimalist yet powerful memory mechanism that inc
 
 ### Principles
 
-1. **Sequence‑based Representation for Sensorimotricity**: The world model captures sensorimotor traces of the form “if I observe $o$ and execute $a$, I expect $o'$”, explicitly disambiguating sequences. We focus on the deterministic case as a proof‑of‑concept.
-2. **Online Learning for Adaptability**: The model is refined at every time‑step, allowing rapid adaptation to novel contingencies encountered through interaction.
-3. **Intrinsic Motivation for Active Exploration**: Without any external reward, the agent is driven by curiosity—maximising predictive accuracy—forcing it to build a comprehensive, task‑agnostic understanding of its environment.
+* **P1 — Prediction as Intrinsic Motivation**: Without any external reward, the agent is driven by curiosity—maximising predictive accuracy—forcing it to build a comprehensive, task‑agnostic understanding of its environment.
+* **P2 — Sequence‑based Representation for Sensorimotricity**: The world model captures sensorimotor traces of the form “if I observe $o$ and execute $a$, I expect $o'$”, explicitly disambiguating situations and making the model highly explainable. We focus on the deterministic case as a proof‑of‑concept.
+* **P3 — Online Learning for Adaptability**: The model is refined at every time‑step through interaction, making the learning process active rather than passive.
 
-### Predictive Trees
+### Prediction Trees
 
-![Example of the construction of predictive trees for a specific observation–action sequence.](docs/img/prediction_trees.png)
+Drawing on insights from adaptive decision‑tree streams [2, 3], we propose a model using several new objects defined as follows.
 
-**Figure 1:** Example of the construction of predictive trees for a specific observation–action sequence.
+The fundamental object we use in our model is called a **prediction path**.
 
-Drawing on insights from adaptive decision‑tree streams [2, 3], we propose a new model based on objects called **Predictive Trees**.
+Following **P1**, a prediction path predicts the perceived result of a chosen action in a given situation. For a vision-only agent, this perception is simply its next observation $o$ and we consider this case from now onwards. The prediction is encoded in a **prediction node** (Fig. 1) that is connected to the agent's representation of the situation and that asserts “given this situation, the next observation will be $o$.”
 
-A predictive tree (Fig. 1) is a rooted, labelled digraph that stores only the **minimal** action–observation history needed for reliable forecasting. The root represents the observation the agent seeks to predict; all other nodes hold an earlier observation and a Boolean flag indicating whether the model is confident in the future prediction if it follows the action path from this source node.
+Following **P2**, the agent's representation of a situation takes the form of an observation–action sequence that alternates observations (represented as nodes) and actions (represented as labelled, directed edges) and that ultimately lead to the prediction node. We refer to the first observation node of a sequence—at which the agent recognizes the prediction path “begins”—as the **source node** (Fig. 1).
+
+As observations and actions happen, paths get traversed during so-called **sequences**. A sequence starts when the source node corresponds to the current observation, which is then marked as **active**. This label is then transmitted as the sequence gets longer down the path until either the sequence doesn't match the observations and actions anymore, or the prediction node becomes active at the end of the path.
+
+Finally, following **P3**, the prediction paths are created incrementally through interaction. Intuitively, when the situation is simple the paths should be short; when the situation is ambiguous the paths should be longer and carry more recent interaction to result in a confident prediction.  
+To implement that behavior, each path has a **confidence** boolean state and each sequence carries a **context**—the (observation, action) pair that occurred just before the start of the sequence at the source node (Fig. 1). These attributes determine how the agent learns from a prediction when a prediction node becomes active at the end of a path:
+* if the path is in an *unconfident* state but the prediction is correct, a new path is created using the context of the sequence by copying the existing path and prepending a new node (observation) to its source node via a new edge (action); the original path then becomes *confident*.
+* if the prediction is wrong, the path becomes *unconfident* until further evidence justifies extension.
+This online update rule ensures longer paths are only created when experience proves additional context is required.
+
+![Example of a prediction path with a sequence (grey dots) activated by a specific observation-action history.](docs/img/prediction_path.svg)
+**Figure 1:** Example of a prediction path with a sequence (grey dots) activated by a specific observation-action history.
+
+While conceptually sound, we saw two flaws in these prediction paths:
+1. Asymptotically, an agent creates as many paths as there are “unique” situations.
+2. In the adequate setting, a short path and a longer path that extends it will both activate a sequence and a prediction. We only want to  
+
+
+A prediction tree (Fig. 2) is a rooted, labelled digraph that stores only the **minimal** action–observation history needed for reliable forecasting. The root represents the observation the agent seeks to predict; all other nodes hold an earlier observation and a Boolean flag indicating whether the model is confident in the future prediction if it follows the action path from this source node.
+
+![Example of the construction of prediction trees for a specific observation–action history with timesteps.](docs/img/prediction_trees.svg)
+**Figure 2:** Example of the construction of prediction trees for a specific observation–action history with timesteps.
 
 At step $t$ the agent activates every node whose observation matches its current perception $o_t$ (dotted circles) and follows the outgoing edge corresponding to the executed action $a_t$. Reaching the root tests the prediction: a failure flips the source node to *unconfident* (black circle), whereas a subsequent success uses backward induction to append a previous observation–action pair to the start node, after which the node becomes *confident* (plain circle).
 
@@ -63,15 +89,15 @@ We outline the pseudocode for the agent's learning process, focusing on how it b
 **Data Structures:**
 
 *   `PredictionForest (F)`: A collection of `PredictionTree`s, indexed by the observation they predict.
-*   `ActiveSequences (S)`: A mapping from each `PredictionTree` in `F` to a set of `ActiveSequence` objects currently being tracked within that tree.
-*   `ActiveSequence`: A tuple `(currentNode, sourceNode, context)` representing a path through a `PredictionTree`.
+*   `Sequences (S)`: A mapping from each `PredictionTree` in `F` to a set of `Sequence` objects currently being tracked within that tree.
+*   `Sequence`: A tuple `(activeNode, sourceNode, context)` representing a sequence through a `PredictionTree`.
 *   `Context`: A tuple `(previousObservation, action)` that led to the activation of a sequence at its `sourceNode`.
 
 ---
 
 #### **Algorithm 1: Agent Learning Step**
 
-**Requires:** Agent's internal state: `PredictionForest F`, `ActiveSequences S`, `previousObservation o_prev`.
+**Requires:** Agent's internal state: `PredictionForest F`, `Sequences S`, `previousObservation o_prev`.
 
 > 1.  *// Action Selection*
 > 2.  `a` ← Select a random action from the set of all possible actions.
@@ -108,7 +134,7 @@ We outline the pseudocode for the agent's learning process, focusing on how it b
 > 2.  `S'_updated` ← an empty set.
 > 3.  
 > 4.  **For each** active sequence `s` in `S_T`:
-> 5.  &nbsp;&nbsp;&nbsp;&nbsp;`(n_next, a_edge)` ← Get the successor node and action from the edge leaving `s.currentNode`.
+> 5.  &nbsp;&nbsp;&nbsp;&nbsp;`(n_next, a_edge)` ← Get the successor node and action from the edge leaving `s.activeNode`.
 > 6.  &nbsp;&nbsp;&nbsp;&nbsp;**If** `a_edge` = `a`:
 > 7.  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*// Avoid paths with a different action from the one chosen*
 > 8.  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**If** `n_next` is the prediction node of `T`:
@@ -116,12 +142,12 @@ We outline the pseudocode for the agent's learning process, focusing on how it b
 > 10.  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**UpdatePrediction**(`T`, `s.sourceNode`, `s.context`, `isCorrect`).
 > 11. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**Else if** `n_next` is in `M`:
 > 12. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*// Propagate the paths that coincide with the current situation*
-> 13. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`s.currentNode` ← `n_next`.
+> 13. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`s.activeNode` ← `n_next`.
 > 14. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Add `s` to `S'_updated`.
 > 15. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Remove `n_next` from `M`.
 > 16. 
 > 17. **For each** remaining node `n_match` in `M`:
-> 18. &nbsp;&nbsp;&nbsp;&nbsp;`s_new` ← Create a new `ActiveSequence(n_match, n_match, C_current)`.
+> 18. &nbsp;&nbsp;&nbsp;&nbsp;`s_new` ← Create a new `Sequence(n_match, n_match, C_current)`.
 > 19. &nbsp;&nbsp;&nbsp;&nbsp;Add `s_new` to `S'_updated`.
 > 20. 
 > 21. **Return** `S'_updated`.
@@ -166,13 +192,13 @@ Use the arrow keys to move and the space key to rotate the piece.
 
 ### Training the Agent
 
-Train the agent on a specific set of tetrominos and save the learned predictive trees.
+Train the agent on a specific set of tetrominos and save the learned prediction trees.
 
 ```bash
 python scripts/learn.py --tetrominos I J S Z --depth 2 --total-steps 100000 --save --verbose
 ```
 - `--tetrominos`: A list of pieces to include in the training environment.
-- `--depth`: The maximum depth of the predictive trees.
+- `--depth`: The maximum depth of the prediction trees.
 - `--total-steps`: The total number of agent-environment interactions.
 - `--save`: Saves the agent's state (including trees) to a directory named after the experiment parameters (e.g., `tetrominos=IJSZ_depth=2`).
 
@@ -204,7 +230,7 @@ Generate plots from the collected data.
   python scripts/plot_error_rates.py --dirs "tetrominos=IJSZ_depth=2" --step 3 --output "error_rate_IJSZ_d2.png"
   ```
 
-### Visualizing Predictive Trees
+### Visualizing Prediction Trees
 
 Render the learned trees from a saved agent state into an interactive HTML file.
 
@@ -228,7 +254,7 @@ For a comprehensive walkthrough of the project's features, including data collec
 - **[docs/demo.ipynb](docs/demo.ipynb)**
 
 This notebook provides runnable examples for:
-1.  Training an agent and observing the growth of its predictive trees.
+1.  Training an agent and observing the growth of its prediction trees.
 2.  Measuring and plotting prediction accuracy over time.
 3.  Generating interactive visualizations of the agent's internal memory.
 
@@ -258,7 +284,3 @@ This work was carried out within the *Multimodal deep SensoriMotor Representatio
 ## Acknowledgements
 
 <!-- Add acknowledgements, funding sources, or project contributors here. -->
-
-## Contact
-
-<!-- Add contact information (email, lab, website) here. -->

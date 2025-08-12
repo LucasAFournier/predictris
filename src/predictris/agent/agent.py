@@ -15,8 +15,8 @@ from .metrics import MetricsRegistry
 
 
 @dataclass
-class ActiveSequence:
-    current_node: UUID
+class Sequence:
+    active_node: UUID
     source_node: UUID
     context: Context
 
@@ -24,7 +24,7 @@ class ActiveSequence:
         return hash(self.source_node)
 
     def __eq__(self, other):
-        if not isinstance(other, ActiveSequence):
+        if not isinstance(other, Sequence):
             return False
         return self.source_node == other.source_node
 
@@ -49,7 +49,7 @@ class Agent:
         self.verbose = verbose
 
         self.prediction_forest = dict[tuple, PredictionTree]()
-        self.active_sequences = dict[PredictionTree, set[ActiveSequence]]()
+        self.active_sequences = dict[PredictionTree, set[Sequence]]()
         self.next_actions = deque[int]()
 
         # metrics initialization
@@ -115,7 +115,7 @@ class Agent:
             )
 
         # context propagation
-        new_active = dict[PredictionTree, set[ActiveSequence]]()
+        new_active = dict[PredictionTree, set[Sequence]]()
 
         for tree in self.prediction_forest.values():
             new_active[tree] = self._update_sequences_for_tree(
@@ -138,13 +138,13 @@ class Agent:
         action: int,
         learn: bool,
         test: bool,
-    ) -> set[ActiveSequence]:
+    ) -> set[Sequence]:
         matching = tree.get_nodes_from_obs(obs).copy()
-        updated = set[ActiveSequence]()
+        updated = set[Sequence]()
 
         for sequence in self.active_sequences.get(tree, set()):
             _, next_node, edge_action = next(
-                iter(tree.out_edges(sequence.current_node, data="action"))
+                iter(tree.out_edges(sequence.active_node, data="action"))
             )
             # deactivate if the action does not match
             if edge_action != action:
@@ -160,9 +160,7 @@ class Agent:
                         sequence.context,
                         correct_pred=correct,
                     )
-                if test and tree.nodes[sequence.source_node].get(
-                    "confident", False
-                ):
+                if test and tree.nodes[sequence.source_node]["confident"]:
                     confidence = tree.nodes[sequence.source_node][
                         "confidence"
                     ]
@@ -174,7 +172,7 @@ class Agent:
 
             # ordinary transition
             elif next_node in matching:
-                sequence.current_node = next_node
+                sequence.active_node = next_node
                 updated.add(sequence)
                 matching.remove(next_node)
 
@@ -185,7 +183,7 @@ class Agent:
                 and random.random() < tree.nodes[node]["confidence"]
             ):
                 updated.add(
-                    ActiveSequence(node, node, self.current_context)
+                    Sequence(node, node, self.current_context)
                 )
 
         return updated
@@ -215,16 +213,16 @@ class Agent:
 
     def _choose_actions(self):
         if self.action_choice == "from_active" and (
-            current := self._get_current_nodes()
+            active := self._get_active_nodes()
         ):
-            tree, node = random.choice(list(current))
+            tree, node = random.choice(list(active))
             self.next_actions.extend(tree.get_actions_to_pred(node))
         else:
             self.next_actions.append(random.choice(list(self.action_dict)))
 
-    def _get_current_nodes(self) -> set[tuple[PredictionTree, UUID]]:
+    def _get_active_nodes(self) -> set[tuple[PredictionTree, UUID]]:
         return {
-            (tree, seq.current_node)
+            (tree, seq.active_node)
             for tree, sequences in self.active_sequences.items()
             for seq in sequences
         }

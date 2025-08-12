@@ -52,7 +52,7 @@ class ErrorRates:
     current_conf: float = 0.0
     current_pred: bool = False
 
-    def on_prediction(self, *, correct: bool, confidence: float) -> None:
+    def on_prediction(self, *, correct: bool, confidence: float) -> None:        
         if confidence > self.current_conf:
             self.current_conf = confidence
             self.current_pred = correct
