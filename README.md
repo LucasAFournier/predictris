@@ -31,7 +31,7 @@
 Artificial agents now outperform humans on many visual and linguistic benchmarks, yet their abilities remain case‑specific due in part to the absence of action‑grounded structure central to human cognition. This gap suggests that perception, action, and prediction must form a tightly coupled feedback loop and that perception be reframed not as passive stimulus reception, but as an active process emerging from the mastery of **sensorimotor contingencies**—systematic relationships between actions and their perceptual consequences [1].
 
 We thus ask: *Can a simple, online structure capture meaningful sensorimotor regularities and foster autonomous object discovery through prediction alone?*  
-We explore this by proposing a minimalist yet powerful memory mechanism that incrementally builds predictive sequences based solely on sensorimotor experience.
+We explore this by proposing a minimalist yet powerful memory mechanism that incrementally builds predictive sequences based on sensorimotor experience.
 
 ## Method
 
@@ -51,15 +51,17 @@ Following **P1**, a prediction path predicts the perceived result of a chosen ac
 
 Following **P2**, the agent's representation of a situation takes the form of an observation–action sequence that alternates observations (represented as nodes) and actions (represented as labelled, directed edges) and that ultimately lead to the prediction node. We refer to the first observation node of a sequence—at which the agent recognizes the prediction path “begins”—as the `source_node` (Fig. 1).
 
-As observations and actions happen, paths get traversed during so-called `Sequence`s. A sequence starts when the source node corresponds to the current observation, which is then marked as `active`. This label is then transmitted as the sequence gets longer down the path until either the sequence doesn't match the observations and actions anymore, or the prediction node becomes active at the end of the path.
+As observations and actions happen, paths get traversed during so-called `Sequence`s. A sequence starts when the source node corresponds to the current observation, which is then marked as `active`. This label is then transmitted down the path as the sequence gets longer until either the sequence doesn't match the observations and actions anymore, or the path ends and the prediction node becomes active.
 
 Finally, following **P3**, the prediction paths are created incrementally through interaction. Intuitively, when the situation is simple the paths should be short; when the situation is ambiguous the paths should be longer and carry more recent interaction to result in a confident prediction.  
-To implement that behavior, each path has a `confidence` boolean state and each sequence carries a `context`—the (observation, action) pair that occurred just before the start of the sequence at the source node (Fig. 1). These attributes determine how the agent learns from a prediction when a prediction node becomes active at the end of a path:
-* if the path is in an *uncertain* state but the prediction is correct, a new path is created using the context of the sequence by copying the existing path and prepending a new node (observation) to its source node via a new edge (action); the original path then becomes *confident*.
+To implement that behavior, each path has a `confidence` boolean state and each sequence carries a `context`—the (observation, action) pair that occurred just before the start of the sequence at the source node (Fig. 1). These attributes determine how the agent learns from a prediction when a prediction node becomes active:
+* if the path is *uncertain* but the prediction is correct, a new path is created using the context of the sequence by copying the existing path and prepending a new node (observation) to the source node via a new edge (action); the original path then becomes *confident*.
 * if the prediction is wrong, the path becomes *uncertain* until further evidence justifies extension.
+
 This online update rule ensures longer paths are only created when experience proves additional context is required.
 
 ![Example of a prediction path with a sequence (grey dots) activated by a specific observation-action history.](docs/img/prediction_path.svg)
+
 **Figure 1:** Example of a prediction path with a sequence (grey dots) activated by a specific observation-action history.
 
 While conceptually sound, we saw two flaws in these prediction paths:
@@ -78,6 +80,7 @@ These trees have the following properties:
 only the **minimal** action–observation history needed for reliable forecasting. The root represents the observation the agent seeks to predict; all other nodes hold an earlier observation and a Boolean flag indicating whether the model is confident in the future prediction if it follows the action path from this source node.
 
 ![Example of the construction of prediction trees for a specific observation–action history with timesteps.](docs/img/prediction_trees.svg)
+
 **Figure 2:** Example of the construction of prediction trees for a specific observation–action history with timesteps.
 
 At step $t$ the agent activates every node whose observation matches its current perception $o_t$ (dotted circles) and follows the outgoing edge corresponding to the executed action $a_t$. Reaching the root tests the prediction: a failure flips the source node to *uncertain* (black circle), whereas a subsequent success uses backward induction to append a previous observation–action pair to the start node, after which the node becomes *confident* (plain circle).
