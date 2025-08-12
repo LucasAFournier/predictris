@@ -281,11 +281,11 @@ This notebook provides runnable examples for:
 
 ## Authors
 
-**Lucas Fournier, Jean‑Charles Quinton¹, Mathieu Lefort², Frédéric Armetta²**  
+**Lucas Fournier**, in collaboration with **Jean‑Charles Quinton¹**, **Mathieu Lefort²** and **Frédéric Armetta²**  
 ¹ Univ. Grenoble Alpes, CNRS, Grenoble INP, LJK, UMR 5224  
 ² Univ. Lyon, UCBL, CNRS, INSA Lyon, LIRIS, UMR 5205
 
-This work was carried out within the *Multimodal deep SensoriMotor Representation learning (MeSMRise)* research project (ANR-23-CE23-0021-01, 04/01/24–09/30/28).
+This work was carried out within the scope of the *Multimodal deep SensoriMotor Representation learning (MeSMRise)* research project (ANR-23-CE23-0021-01, 04/01/24–09/30/28).
 
 
 ## License
