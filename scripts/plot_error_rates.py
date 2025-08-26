@@ -81,7 +81,7 @@ if __name__ == "__main__":
         else:
             total_steps_data.append([])
         error_rates_data.append(error_rates_hist)
-        legends.append(Path(exp_dir).name + f" step={args.step}")
+        legends.append(Path(exp_dir).name + f"_step={args.step}")
 
     output_path = (
         Path("plots/error-rates") / args.output if args.output else None

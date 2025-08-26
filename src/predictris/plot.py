@@ -32,7 +32,7 @@ def group_parameters(
 
 def format_title(common_params: Dict[str, str]) -> str:
     """Format common parameters for title."""
-    return ", ".join(f"{k}={v}" for k, v in common_params.items())
+    return ", ".join(f"{k}={v}" for k, v in sorted(common_params.items()))
 
 
 def format_legend(config: str, varying_params: Dict[str, bool]) -> str:
@@ -67,9 +67,9 @@ class PlotMetrics:
             "confidences": self._plot_distribution_over_steps,
         }
         self.metric_configs = {
-            "nodes_count": {"ylabel": "Total Nodes Count", "ylim_bottom": 0},
+            "nodes_count": {"ylabel": "Prediction Forest Size", "ylim_bottom": 0},
             "time_per_step": {"ylabel": "Time per Step (s)", "ylim_bottom": 0},
-            "confidences": {"ylabel": "Node Confidence", "ylim": (0, 1)},
+            "confidences": {"ylabel": "Path Confidence Distribution", "ylim": (0, 1)},
         }
 
     def plot(self, metrics_to_plot: List[str]):
@@ -79,7 +79,7 @@ class PlotMetrics:
         fig, axes = plt.subplots(
             num_metrics,
             1,
-            figsize=(10, 5 * num_metrics),
+            figsize=(4, 2.5 * num_metrics),
             sharex=True,
             squeeze=False,
         )
@@ -198,7 +198,7 @@ def plot_error_rates(
     output_path: str = None,
 ):
     """Create plot of best prediction error rates vs total steps."""
-    fig, ax = plt.subplots(figsize=(15, 6))
+    fig, ax = plt.subplots(figsize=(10, 5))
     colors = plt.cm.tab10(np.linspace(0, 1, len(total_steps_data)))
 
     max_x = 0
@@ -220,12 +220,13 @@ def plot_error_rates(
             max_x = max(max_x, total_steps[-1])
 
     ax.set_xlabel("Total Steps")
-    ax.set_ylabel("Prediction Success Rate")
+    ax.set_ylabel("Prediction Error Rate")
     ax.set_ylim(0, 1)
     ax.ticklabel_format(axis="x", style="sci", scilimits=(0, 0))
 
     if hline_y is not None:
-        ax.axhline(y=hline_y, color="gray", linewidth=3, linestyle="--")
+        ax.axhline(y=hline_y, color="gray", linewidth=3, linestyle="--",
+                   label="baseline")
 
     ax.legend(
         bbox_to_anchor=(1.02, 1),

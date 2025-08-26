@@ -35,10 +35,9 @@ class PredictionTree(nx.DiGraph):
     _cache = PredictionTreeCache()
 
     def __init__(
-        self, obs: Observation, depth: int, id_generator: callable = uuid4
+        self, obs: Observation, id_generator: callable = uuid4
     ):
         super().__init__()
-        self.depth = depth
         self.id_generator = id_generator
         self._nodes_by_obs = dict[Observation, set[UUID]]()
 
